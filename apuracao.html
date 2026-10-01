@@ -53,7 +53,14 @@
       </div>
     </nav>
     <main class="wrap-l">
-      <section data-painel="painel" id="sec-painel"></section>
+      <section data-painel="painel">
+        <div class="acoes-painel" id="acoes-painel">
+          <a class="btn btn-sec btn-sm" href="telao.html" target="_blank" rel="noopener" id="ap-telao"></a>
+          <button class="btn btn-sec btn-sm" type="button" id="ap-excel"></button>
+          <a class="btn btn-sec btn-sm" href="relatorio.html" target="_blank" rel="noopener" id="ap-relatorio"></a>
+        </div>
+        <div id="sec-painel"></div>
+      </section>
       <section data-painel="conferencia" id="sec-conferencia" hidden></section>
       <section data-painel="lancamentos" id="sec-lancamentos" hidden></section>
       <section data-painel="manual" id="sec-manual" hidden></section>
@@ -66,6 +73,7 @@
   <script src="assets/js/core.js"></script>
   <script src="assets/js/common.js"></script>
   <script src="assets/js/painel.js"></script>
+  <script src="assets/js/relatorios.js"></script>
   <script src="assets/js/apuracao.js"></script>
 </body>
 </html>

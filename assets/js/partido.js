@@ -7,6 +7,7 @@
 
   App.bannerDemo('Senha: <b>partido</b>.');
   $('#btn-sair').innerHTML = ICON.sair;
+  $('#btn-telao').innerHTML = ICON.tv;
   $('#l-ver').innerHTML = ICON.olho;
 
   function telaLogin() {

@@ -600,3 +600,7 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
 @media (max-width: 350px) { .votos-input { width: 130px; font-size: 27px; } }
 .chip.chip-total { min-width: 64px; background: var(--azul-noite); color: #fff; letter-spacing: .5px; }
 .chip.chip-total.PENDENTE { background: repeating-linear-gradient(135deg, var(--pendente) 0 5px, #f47a1d 5px 9px); }
+
+.acoes-painel { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 12px; }
+.acoes-painel .btn { background: #fff; }
+@media (max-width: 640px) { .acoes-painel { justify-content: stretch; } .acoes-painel .btn { flex: 1 1 auto; } }

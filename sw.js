@@ -1,9 +1,9 @@
 /* Guarda as telas no celular para abrir mesmo sem internet */
-var VERSAO = 'apuracao-v3';
+var VERSAO = 'apuracao-v4';
 var ARQUIVOS = [
-  './', 'index.html', 'fiscal.html', 'apuracao.html', 'partido.html', 'manifest.webmanifest',
-  'assets/css/app.css', 'assets/js/config.js', 'assets/js/core.js', 'assets/js/common.js',
-  'assets/js/fiscal.js', 'assets/js/painel.js', 'assets/js/apuracao.js', 'assets/js/partido.js',
+  './', 'index.html', 'fiscal.html', 'apuracao.html', 'partido.html', 'telao.html', 'relatorio.html', 'manifest.webmanifest',
+  'assets/css/app.css', 'assets/css/telao.css', 'assets/css/relatorio.css', 'assets/js/config.js', 'assets/js/core.js', 'assets/js/common.js',
+  'assets/js/fiscal.js', 'assets/js/painel.js', 'assets/js/apuracao.js', 'assets/js/partido.js', 'assets/js/telao.js', 'assets/js/relatorio.js', 'assets/js/relatorios.js',
   'assets/img/logo-480.png', 'assets/img/favicon.png', 'assets/img/icon-192.png', 'assets/img/icon-512.png'
 ];
 

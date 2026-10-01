@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <meta name="robots" content="noindex">
+  <title>Telão — Fabricio Petri 36.222</title>
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/telao.css">
+</head>
+<body class="pg-telao">
+  <!-- Login -->
+  <div id="tela-login" class="login-pg" hidden>
+    <header class="hero">
+      <a class="voltar" href="./" aria-label="Voltar ao início"><span data-voltar></span>Início</a>
+      <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+      <p class="sub">Modo telão</p>
+    </header>
+    <form class="card login-card" id="form-login">
+      <h1>Digite a senha</h1>
+      <p class="muted small" style="margin:0 0 18px">Use a senha da Apuração ou do Partido.</p>
+      <div class="campo"><label for="l-senha">Senha de acesso</label>
+        <input class="input" id="l-senha" type="password" autocomplete="current-password" required></div>
+      <div id="l-demo" class="aviso aviso-info small" hidden></div>
+      <button class="btn btn-primario btn-xl" type="submit" id="l-entrar">Abrir telão</button>
+    </form>
+  </div>
+
+  <!-- Telão -->
+  <main id="telao" class="telao" hidden>
+    <header class="t-topo">
+      <img class="t-logo" src="assets/img/logo-480.png" alt="Fabricio Petri 36.222" width="480" height="410">
+      <div class="t-titulo">
+        <div class="t-aovivo"><span class="t-ponto"></span>APURAÇÃO AO VIVO</div>
+        <div class="t-mun" id="t-mun">ANCHIETA</div>
+      </div>
+      <div class="t-hora"><b id="t-hora">--:--</b><span id="t-atualizado">atualizando…</span></div>
+    </header>
+
+    <section class="t-principal">
+      <div class="t-votos">
+        <div class="t-rot">VOTOS CONFIRMADOS</div>
+        <div class="t-numero num" id="t-votos">0</div>
+        <div class="t-sub" id="t-sub"></div>
+      </div>
+      <div class="t-urnas">
+        <div class="t-rot">URNAS APURADAS</div>
+        <div class="t-pct num" id="t-pct">0%</div>
+        <div class="t-barra"><i class="v" id="t-bar-v"></i><i class="p" id="t-bar-p"></i></div>
+        <div class="t-sub" id="t-urnas-txt"></div>
+      </div>
+    </section>
+
+    <section class="t-locais">
+      <div class="t-rot">MAIORES VOTAÇÕES POR LOCAL</div>
+      <ol id="t-ranking"></ol>
+    </section>
+
+    <footer class="t-rodape">
+      <span id="t-outros"></span>
+      <span class="t-legenda"><i class="v"></i>confirmados <i class="p"></i>em conferência</span>
+    </footer>
+
+    <div class="t-controles" id="t-controles">
+      <select id="t-sel-mun" aria-label="Município"></select>
+      <button type="button" id="t-cheia">Tela cheia</button>
+      <a href="./" id="t-sair">Sair</a>
+    </div>
+  </main>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/painel.js"></script>
+  <script src="assets/js/telao.js"></script>
+</body>
+</html>

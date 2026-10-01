@@ -15,6 +15,17 @@
   App.bannerDemo('Senha: <b>apuracao</b>.');
   $('#btn-atualizar').innerHTML = ICON.atualizar;
   $('#btn-sair').innerHTML = ICON.sair;
+  $('#ap-telao').innerHTML = ICON.tv + 'Modo telão';
+  $('#ap-excel').innerHTML = ICON.excel + 'Exportar Excel';
+  $('#ap-relatorio').innerHTML = ICON.impressora + 'Relatório para impressão';
+  $('#ap-excel').addEventListener('click', function () {
+    if (!dados) return App.toast('Aguarde os dados carregarem.', 'erro');
+    var b = this; App.carregando(b, true, 'Gerando…');
+    carregar(false).then(function () { return Relat.exportarExcel(dados); })
+      .then(function (nome) { App.toast('Planilha gerada: ' + nome, 'ok', 5000); })
+      .catch(function (e) { App.toast(e.message, 'erro', 6000); })
+      .then(function () { App.carregando(b, false); });
+  });
   $('#l-ver').innerHTML = ICON.olho;
 
   /* ================= LOGIN ================= */
@@ -574,7 +585,8 @@
       '<button class="btn btn-azul" type="submit" id="pg-salvar" style="margin-top:12px">Salvar alterações</button></form>' +
       '<div><section class="card"><div class="card-titulo"><h3>Links para compartilhar</h3></div>' +
       linkLinha('Link único (todos)', 'Um só link com as três opções: Fiscal, Apuração e Partido. É este que você divulga.', base) +
-      linkLinha('Atalho direto do fiscal', 'Opcional: abre direto o formulário do BU, pulando a escolha.', base + 'fiscal.html') + '</section>' +
+      linkLinha('Atalho direto do fiscal', 'Opcional: abre direto o formulário do BU, pulando a escolha.', base + 'fiscal.html') +
+      linkLinha('Modo telão (TV do comitê)', 'Abre em tela cheia e atualiza sozinho. Pede a senha da Apuração ou do Partido.', base + 'telao.html') + '</section>' +
       (App.DEMO ? '<section class="card"><div class="card-titulo"><h3>Modo demonstração</h3></div><p class="muted small" style="margin-top:0">Os dados de teste ficam só neste navegador. Você pode recomeçar com os dados de exemplo.</p><button class="btn btn-perigo-sec" id="pg-reset">Restaurar dados de exemplo</button></section>' : '') +
       '</div></div>';
     $$('[data-copiar]').forEach(function (b) {

@@ -70,6 +70,12 @@ Se quiser, existe também o atalho que abre direto o formulário do fiscal (`...
 
 ---
 
+## Extras da Apuração (aba Painel)
+
+- **Modo telão** (`telao.html`): tela cheia para a TV do comitê, com o total de votos, as urnas apuradas e os 5 maiores locais. Atualiza sozinho a cada 30 s. Abre com a senha da Apuração ou do Partido (o Partido também tem o botão de TV no topo). Na TV: clique em **Tela cheia** ou aperte **F**.
+- **Exportar Excel**: baixa uma planilha .xlsx com as abas *Resumo*, *Por local*, *Por seção* (incluindo seções sem envio) e *Todos os envios* (histórico completo, com link da foto do BU).
+- **Relatório para impressão** (`relatorio.html`): relatório em A4 com resumo, votos por local e por seção. Escolha o município e se quer só os votos confirmados, depois **Imprimir / Salvar PDF**. Abre só com a senha da Apuração.
+
 ## Antes do domingo (checklist)
 
 - [ ] Em **Parâmetros → Locais e seções**, confira os locais e seções de 2026 (dá para editar, criar, desativar ou **importar uma lista** colando `LOCAL;SEÇÃO`).
@@ -114,6 +120,8 @@ Edite (ou cole o código novo inteiro), salve e vá em **Implantar → Gerenciar
 
 ```
 index.html          Tela inicial (link único com as 3 opções)
+telao.html          Modo telão (TV)
+relatorio.html      Relatório para impressão / PDF
 fiscal.html         Fiscal
 apuracao.html       Apuração
 partido.html        Partido
