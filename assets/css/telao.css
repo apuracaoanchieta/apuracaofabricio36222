@@ -70,6 +70,11 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, .2);
 }
 .telao.cheia .t-controles #t-cheia { display: none; }
+.t-controles .t-voltar { background: var(--laranja); color: #fff; }
+/* o Voltar fica sempre visível (discreto) no canto, mesmo quando os outros controles somem */
+.t-voltar-fixo { position: fixed; left: 1.2vw; bottom: 1.4vh; z-index: 11; }
+.t-credito { font-size: clamp(10px, 1.4vh, 18px); font-weight: 600; opacity: .8; white-space: nowrap; }
+.t-credito b { font-weight: 800; }
 
 @keyframes tsobe { from { transform: translateY(1.4vh); opacity: .3; } }
 .t-anima { animation: tsobe .6s ease-out; }

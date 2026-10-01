@@ -134,7 +134,8 @@
 
     html += '<footer class="rel-rodape"><p>"Confirmado" = conferido pela equipe de apuração com a foto do boletim de urna. "Em conferência" = enviado pelo fiscal e ainda não conferido. ' +
       'Totais informados são resultados recebidos sem o detalhe por seção. Este é um levantamento interno da campanha; o resultado oficial é o divulgado pelo TSE/TRE-ES.</p>' +
-      '<div class="rel-assin"><div>Responsável pela apuração</div><div>Data e hora</div></div></footer>';
+      '<div class="rel-assin"><div>Responsável pela apuração</div><div>Data e hora</div></div>' +
+      '<p class="rel-credito">Sistema de apuração desenvolvido por <b>DERYCK NOGUEIRA</b></p></footer>';
     $('#rel').innerHTML = html;
   }
 

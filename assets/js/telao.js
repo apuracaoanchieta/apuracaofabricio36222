@@ -135,6 +135,12 @@
     else document.exitFullscreen();
   }
   $('#t-cheia').addEventListener('click', alternarCheia);
+  // Voltar: retorna à tela de onde veio (Apuração/Partido); se abriu direto, vai para o início
+  $('#t-voltar').addEventListener('click', function () {
+    if (document.fullscreenElement) document.exitFullscreen();
+    var veio = document.referrer && document.referrer.indexOf(location.origin) === 0 && !/telao\.html/.test(document.referrer);
+    if (veio && history.length > 1) history.back(); else location.href = './';
+  });
   document.addEventListener('keydown', function (e) { if ((e.key === 'f' || e.key === 'F') && !$('#telao').hidden) alternarCheia(); });
   document.addEventListener('fullscreenchange', function () { $('#telao').classList.toggle('cheia', !!document.fullscreenElement); });
   // mantém a tela da TV acesa

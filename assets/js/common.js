@@ -323,7 +323,15 @@ var App = (function () {
     d.innerHTML = '<b>MODO DEMONSTRAÇÃO</b> — dados fictícios, salvos só neste aparelho. ' + (extra || '');
     document.body.insertBefore(d, document.body.firstChild);
   }
-  document.addEventListener('DOMContentLoaded', function () { $$('[data-voltar]').forEach(function (e) { e.innerHTML = ICON.seta; }); });
+  document.addEventListener('DOMContentLoaded', function () {
+    $$('[data-voltar]').forEach(function (e) { e.innerHTML = ICON.seta; });
+    // crédito do desenvolvedor no rodapé de todas as telas (o telão e o relatório têm o seu próprio)
+    if (!$('.credito')) {
+      var f = document.createElement('footer'); f.className = 'credito';
+      f.innerHTML = 'Desenvolvido por <b>DERYCK NOGUEIRA</b>';
+      document.body.appendChild(f);
+    }
+  });
   /* Campo de votos: só números, até 6 dígitos, com ponto de milhar (4.111 / 123.456) */
   var MAX_DIGITOS_VOTOS = 6;
   function formatarVotos(txt) {
