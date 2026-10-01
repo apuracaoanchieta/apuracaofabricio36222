@@ -321,12 +321,34 @@ var App = (function () {
     document.body.insertBefore(d, document.body.firstChild);
   }
   document.addEventListener('DOMContentLoaded', function () { $$('[data-voltar]').forEach(function (e) { e.innerHTML = ICON.seta; }); });
+  /* Campo de votos: só números, até 6 dígitos, com ponto de milhar (4.111 / 123.456) */
+  var MAX_DIGITOS_VOTOS = 6;
+  function formatarVotos(txt) {
+    var d = String(txt === null || txt === undefined ? '' : txt).replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, MAX_DIGITOS_VOTOS);
+    return d.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function valorVotos(txt) { var d = String(txt || '').replace(/\D/g, ''); return d === '' ? NaN : Number(d); }
+  function campoVotos(inp, aoMudar) {
+    inp.setAttribute('maxlength', String(MAX_DIGITOS_VOTOS + 2));
+    inp.addEventListener('input', function () {
+      var antes = inp.value, pos = inp.selectionStart || antes.length;
+      var digitosAntes = antes.slice(0, pos).replace(/\D/g, '').length;
+      inp.value = formatarVotos(antes);
+      // mantém o cursor no lugar certo depois de inserir os pontos
+      var i = 0, cont = 0;
+      while (i < inp.value.length && cont < digitosAntes) { if (/\d/.test(inp.value[i])) cont++; i++; }
+      try { inp.setSelectionRange(i, i); } catch (e) { /* ok */ }
+      if (aoMudar) aoMudar();
+    });
+    if (inp.value) inp.value = formatarVotos(inp.value);
+  }
   function resetDemo() { lsDel('fp_demo_v1'); demoDb = null; }
 
   return {
     DEMO: DEMO, CFG: CFG, api: api, sessao: sessao, lsGet: lsGet, lsSet: lsSet, lsDel: lsDel, uuid: uuid, carimbo: carimbo,
     $: $, $$: $$, h: h, n: n, pct: pct, hora: hora, dataHora: dataHora, tel: tel, whatsapp: whatsapp, iniciais: iniciais,
     ICON: ICON, toast: toast, modal: modal, haModal: haModal, cabecalhoModal: cabecalhoModal, confirmar: confirmar,
-    carregando: carregando, comprimirFoto: comprimirFoto, girarFoto: girarFoto, bannerDemo: bannerDemo, resetDemo: resetDemo
+    carregando: carregando, comprimirFoto: comprimirFoto, girarFoto: girarFoto, bannerDemo: bannerDemo, resetDemo: resetDemo,
+    formatarVotos: formatarVotos, valorVotos: valorVotos, campoVotos: campoVotos
   };
 })();

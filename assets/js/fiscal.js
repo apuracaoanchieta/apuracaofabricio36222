@@ -193,7 +193,7 @@
     this.classList.remove('erro'); App.lsSet(K_ULT_LOCAL, this.value); $('#f-secao').value = ''; montarSecoes();
   });
   $('#f-secao').addEventListener('change', function () { this.classList.remove('erro'); ajudaSecao(); });
-  $('#f-votos').addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); this.closest('.votos-box').style.borderColor = ''; });
+  App.campoVotos($('#f-votos'), function () { $('#f-votos').closest('.votos-box').style.borderColor = ''; });
 
   /* ---------------- Foto ---------------- */
   function aoEscolherFoto(e) {
@@ -244,12 +244,13 @@
     App.lsSet(K_IDENT, { nome: nome, telefone: telefone });
     var local = params.locais.filter(function (l) { return l.id === localId; })[0];
     var secao = params.secoes.filter(function (s) { return s.id === secaoId; })[0];
-    var v = parseInt(votos, 10);
-    var limite = parseInt(cfg.alerta_votos_max, 10) || 400;
+    var v = App.valorVotos(votos);
+    var limite = parseInt(String(cfg.alerta_votos_max).replace(/\D/g, ''), 10) || 400;
+    var alertaAtivo = String(cfg.alerta_votos_ativo).toUpperCase() !== 'FALSE';
     var jaEnviada = recebidasSet()[secaoId];
 
     var m = App.modal(App.cabecalhoModal('Confira antes de enviar', 'Compare cada dado com o boletim impresso.') +
-      (v > limite ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Valor alto</b>' + v + ' votos é acima do esperado para uma seção (' + limite + '). Confira se digitou certo.</div></div>' : '') +
+      (alertaAtivo && v > limite ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Valor alto</b>' + App.n(v) + ' votos é acima do esperado para uma seção (' + App.n(limite) + '). Confira se digitou certo.</div></div>' : '') +
       (jaEnviada ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Seção já enviada</b>Este envio vai para conferência junto com o anterior.</div></div>' : '') +
       '<div class="resumo-envio">' +
       '<div class="linha"><span>Local</span><b>' + h(local.nome) + '</b></div>' +

@@ -121,9 +121,11 @@
 
   function porId(id) { return dados.lancamentos.filter(function (l) { return l.id === id; })[0]; }
   function nomeLocal(l) {
+    if (!l.local_id && Core.ehTotal(l)) return 'TOTAL DE ' + (l.municipio || '');
     var loc = dados.locais.filter(function (x) { return x.id === l.local_id; })[0];
     return loc ? loc.nome : l.local;
   }
+  function rotuloSecao(l) { return Core.ehTotal(l) ? (l.local_id ? 'Total do local' : 'Total do município') : 'Seção ' + l.secao; }
   function opcoesLocaisLanc(lista, valor) {
     var vistos = {}, ops = [];
     lista.forEach(function (l) { if (!vistos[l.local_id]) { vistos[l.local_id] = true; ops.push({ id: l.local_id, nome: nomeLocal(l), mun: l.municipio }); } });
@@ -141,9 +143,9 @@
   function cartaoConf(l, dentroDup) {
     var corr = corrigido(l);
     return '<div class="conf' + (dupMap[l.secao_id] && !dentroDup ? ' dup' : '') + '" style="' + (l.status === 'VALIDADO' ? 'border-left-color:var(--validado)' : '') + '">' +
-      '<div class="l1"><div><div class="local">' + h(nomeLocal(l)) + '</div><div class="secao">Seção ' + h(l.secao) +
+      '<div class="l1"><div><div class="local">' + h(nomeLocal(l)) + '</div><div class="secao">' + h(rotuloSecao(l)) +
       (l.municipio && Core.norm(l.municipio) !== Core.norm(dados.config.municipio_principal) ? ' · ' + h(l.municipio) : '') + '</div></div>' +
-      '<div class="votos num">' + App.n(l.votos) + '<small>VOTOS' + (corr ? ' (inf. ' + l.votos_informados + ')' : '') + '</small></div></div>' +
+      '<div class="votos num">' + App.n(l.votos) + '<small>VOTOS' + (corr ? ' (inf. ' + App.n(l.votos_informados) + ')' : '') + '</small></div></div>' +
       '<div class="fiscal"><span>' + h(l.nome || '—') + '</span>' +
       (l.telefone ? '<a href="' + App.whatsapp(l.telefone) + '" target="_blank" rel="noopener">' + App.tel(l.telefone) + '</a>' : '') +
       '<span>' + App.hora(l.recebido_em) + '</span>' + (dentroDup ? selo(l.status) : '') + '</div>' +
@@ -220,7 +222,7 @@
     $$('[data-usar]', el).forEach(function (b) {
       b.onclick = function () {
         var l = porId(b.dataset.usar);
-        App.confirmar('Usar este envio?', 'Seção ' + h(l.secao) + ' ficará com <b>' + App.n(l.votos) + ' votos</b> (enviado por ' + h(l.nome) + ' às ' + App.hora(l.recebido_em) + '). Os outros envios desta seção serão marcados como substituídos.', 'Usar este').then(function (ok) {
+        App.confirmar('Usar este envio?', h(rotuloSecao(l)) + ' ficará com <b>' + App.n(l.votos) + ' votos</b> (enviado por ' + h(l.nome) + ' às ' + App.hora(l.recebido_em) + '). Os outros envios desta seção serão marcados como substituídos.', 'Usar este').then(function (ok) {
           if (ok) validar(l.id);
         });
       };
@@ -248,7 +250,7 @@
     var outros = dados.lancamentos.filter(function (o) { return o.secao_id === l.secao_id && o.id !== l.id && (o.status === 'PENDENTE' || o.status === 'VALIDADO'); });
     var corr = corrigido(l);
     var temProx = !!proximoPendente(l.id);
-    var html = App.cabecalhoModal(nomeLocal(l) + ' — Seção ' + l.secao, h(l.municipio) + ' · recebido ' + App.dataHora(l.recebido_em) + ' · ' + selo(l.status)) +
+    var html = App.cabecalhoModal(nomeLocal(l) + ' — ' + rotuloSecao(l), h(l.municipio) + ' · recebido ' + App.dataHora(l.recebido_em) + ' · ' + selo(l.status)) +
       '<div class="conf-modal">' +
       '<div><div class="foto-viewer" id="cf-viewer"><div class="carregando">' + (l.foto_id ? 'Carregando foto do BU…' : 'Este envio não tem foto.') + '</div></div>' +
       '<div class="foto-ferr">' + (l.foto_id ? '<button class="btn btn-sec btn-sm" id="cf-zoom">' + ICON.zoom + 'Ampliar</button><button class="btn btn-sec btn-sm" id="cf-girar">' + ICON.girar + 'Girar</button><a class="btn btn-ghost btn-sm" id="cf-drive" target="_blank" rel="noopener" hidden>Abrir no Drive</a>' : '') + '</div></div>' +
@@ -264,8 +266,8 @@
       (l.obs ? '<div class="linha"><span>Observação</span><b>' + h(l.obs) + '</b></div>' : '') +
       '</div>' +
       '<div class="campo"><label for="cf-votos">Votos de ' + h(dados.config.candidato_nome || 'Fabricio Petri') + ' (confira com a foto)</label>' +
-      '<div class="votos-box"><div class="cand"><b>' + h(dados.config.candidato_numero || '36.222') + '</b><span>' + (corr ? 'fiscal informou ' + l.votos_informados : 'informado pelo fiscal') + '</span></div>' +
-      '<input class="votos-input" id="cf-votos" inputmode="numeric" maxlength="4" value="' + (typeof l.votos === 'number' ? l.votos : '') + '" autocomplete="off"></div>' +
+      '<div class="votos-box"><div class="cand"><b>' + h(dados.config.candidato_numero || '36.222') + '</b><span>' + (corr ? 'fiscal informou ' + App.n(l.votos_informados) : 'informado pelo fiscal') + '</span></div>' +
+      '<input class="votos-input" id="cf-votos" inputmode="numeric" maxlength="8" value="' + (typeof l.votos === 'number' ? App.formatarVotos(l.votos) : '') + '" autocomplete="off"></div>' +
       '<div class="ajuda">Se o número estiver diferente do BU, corrija antes de validar.</div></div>' +
       '<div class="acoes" style="flex-direction:column">' +
       (l.status !== 'VALIDADO' ? '<button class="btn btn-ok btn-xl" id="cf-validar">' + ICON.check + 'Validar' + (temProx ? ' e ir para o próximo' : '') + '</button>' : '<button class="btn btn-ok btn-xl" id="cf-validar">' + ICON.check + 'Salvar votos</button>') +
@@ -275,7 +277,7 @@
       '</div></div></div></div>';
     var m = App.modal(html, { classe: 'largo' });
     var inp = $('#cf-votos', m.el);
-    inp.addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); });
+    App.campoVotos(inp);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('#cf-validar', m.el).click(); } });
     if (window.innerWidth > 760) setTimeout(function () { inp.focus(); inp.select(); }, 80);
 
@@ -298,8 +300,8 @@
       if (v === '') { App.toast('Informe a quantidade de votos.', 'erro'); inp.focus(); return; }
       App.carregando(b, true, 'Salvando…');
       var prox = l.status === 'PENDENTE' ? proximoPendente(l.id) : null;
-      chamar('apuracao.validar', { id: l.id, votos: Number(v) }).then(function () {
-        App.toast('Seção ' + l.secao + ' confirmada com ' + App.n(Number(v)) + ' votos.', 'ok');
+      chamar('apuracao.validar', { id: l.id, votos: App.valorVotos(v) }).then(function () {
+        App.toast('Seção ' + l.secao + ' confirmada com ' + App.n(App.valorVotos(v)) + ' votos.', 'ok');
         m.fechar();
         return carregar(true).then(function () {
           if (prox) { var p = porId(prox.id); if (p && p.status === 'PENDENTE') abrirConferencia(p.id); }
@@ -378,8 +380,8 @@
         return '<tr' + (dupMap[l.secao_id] && (l.status === 'PENDENTE' || l.status === 'VALIDADO') ? ' style="background:#fff8f8"' : '') + '>' +
           '<td data-l="Hora" class="num">' + App.dataHora(l.recebido_em) + '</td>' +
           '<td data-l="Local"><b>' + h(nomeLocal(l)) + '</b>' + (l.municipio && Core.norm(l.municipio) !== Core.norm(dados.config.municipio_principal) ? '<div class="tiny muted">' + h(l.municipio) + '</div>' : '') + '</td>' +
-          '<td data-l="Seção" class="r">' + h(l.secao) + '</td>' +
-          '<td data-l="Votos" class="r"><b>' + App.n(l.votos) + '</b>' + (corr ? '<div class="tiny muted">inf. ' + l.votos_informados + '</div>' : '') + '</td>' +
+          '<td data-l="Seção" class="r">' + (Core.ehTotal(l) ? '<span class="tiny muted">total</span>' : h(l.secao)) + '</td>' +
+          '<td data-l="Votos" class="r"><b>' + App.n(l.votos) + '</b>' + (corr ? '<div class="tiny muted">inf. ' + App.n(l.votos_informados) + '</div>' : '') + '</td>' +
           '<td data-l="Fiscal">' + h(l.nome) + (l.origem === 'APURACAO' ? ' <span class="tiny muted">(manual)</span>' : '') + '</td>' +
           '<td data-l="Status">' + selo(l.status) + '</td>' +
           '<td data-l=""><button class="btn btn-sec btn-sm" data-abrir="' + l.id + '">Abrir</button></td></tr>';
@@ -389,35 +391,50 @@
 
   /* ================= LANÇAMENTO MANUAL ================= */
   var fotoManual = null;
+  var NOVO = '__novo__';
   function municipiosConhecidos() {
     var m = {}; m[String(dados.config.municipio_principal || 'ANCHIETA').toUpperCase()] = true;
-    dados.locais.forEach(function (l) { m[l.municipio] = true; });
-    return Object.keys(m).sort();
+    dados.locais.forEach(function (l) { if (l.municipio) m[l.municipio.toUpperCase()] = true; });
+    dados.lancamentos.forEach(function (l) { if (l.municipio) m[l.municipio.toUpperCase()] = true; });
+    return Object.keys(m).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); });
   }
   function renderManual() {
     if (!dados) return;
     var el = $('#sec-manual');
     if ($('#form-manual', el)) { atualizarListasManual(); return; }
-    el.innerHTML = '<div style="max-width:720px;margin:0 auto"><form class="card" id="form-manual" novalidate>' +
-      '<div class="card-titulo"><div><h2>Lançar resultado manualmente</h2><p class="muted small" style="margin:4px 0 0">Para BUs recebidos por outros meios (WhatsApp, ligação, outros municípios). O lançamento entra como <b>confirmado</b>.</p></div></div>' +
-      '<div class="grid-2"><div class="campo"><label for="mn-mun">Município</label><input class="input" id="mn-mun" list="dl-mun" autocomplete="off"></div>' +
-      '<div class="campo"><label for="mn-local">Local de votação</label><input class="input" id="mn-local" list="dl-local" autocomplete="off" placeholder="Escolha ou digite um novo"></div></div>' +
-      '<div class="grid-2"><div class="campo"><label for="mn-secao">Seção</label><input class="input" id="mn-secao" list="dl-secao" inputmode="numeric" autocomplete="off"></div>' +
+    el.innerHTML = '<div style="max-width:760px;margin:0 auto"><form class="card" id="form-manual" novalidate>' +
+      '<div class="card-titulo"><div><h2>Lançar resultado manualmente</h2><p class="muted small" style="margin:4px 0 0">Para resultados recebidos por outros meios (WhatsApp, ligação, outros municípios). Entra como <b>confirmado</b>.<br>' +
+      'Só <b>município e votos</b> são obrigatórios. Sem local, vale como <b>total do município</b>; com local e sem seção, como <b>total do local</b>.</p></div></div>' +
+      '<div class="grid-2">' +
+      '<div class="campo"><label for="mn-mun">Município</label><select class="input" id="mn-mun"></select>' +
+      '<input class="input" id="mn-mun-novo" placeholder="Nome do novo município" autocomplete="off" style="margin-top:8px" hidden></div>' +
+      '<div class="campo"><label for="mn-local">Local de votação <span class="muted">(opcional)</span></label><select class="input" id="mn-local"></select>' +
+      '<input class="input" id="mn-local-novo" placeholder="Nome do novo local" autocomplete="off" style="margin-top:8px" hidden></div></div>' +
+      '<div class="grid-2"><div class="campo"><label for="mn-secao">Seção <span class="muted">(opcional)</span></label><input class="input" id="mn-secao" list="dl-secao" inputmode="numeric" autocomplete="off" placeholder="Deixe vazio para lançar o total"><datalist id="dl-secao"></datalist></div>' +
       '<div class="campo"><label for="mn-votos">Votos de ' + h(dados.config.candidato_nome || 'Fabricio Petri') + '</label><input class="input" id="mn-votos" inputmode="numeric" autocomplete="off" style="font-size:22px;font-weight:800;color:var(--laranja)"></div></div>' +
+      '<div class="aviso aviso-info" id="mn-resumo"></div>' +
       '<div class="grid-2"><div class="campo"><label for="mn-nome">Quem informou <span class="muted">(opcional)</span></label><input class="input" id="mn-nome" autocomplete="off"></div>' +
       '<div class="campo"><label for="mn-tel">Telefone <span class="muted">(opcional)</span></label><input class="input" id="mn-tel" type="tel" inputmode="tel" autocomplete="off"></div></div>' +
-      '<div class="campo"><label for="mn-obs">Observação <span class="muted">(opcional)</span></label><input class="input" id="mn-obs" maxlength="200" autocomplete="off"></div>' +
-      '<div class="campo"><span class="rotulo">Foto do BU <span class="muted">(opcional)</span></span><div class="foto-area" id="mn-foto-area">' +
+      '<div class="campo"><label for="mn-obs">Observação <span class="muted">(opcional)</span></label><input class="input" id="mn-obs" maxlength="200" autocomplete="off" placeholder="Ex.: informado pelo coordenador regional"></div>' +
+      '<div class="campo"><span class="rotulo">Foto do BU ou do comprovante <span class="muted">(opcional)</span></span><div class="foto-area" id="mn-foto-area">' +
       '<div id="mn-foto-vazia"><div class="foto-botoes"><label class="btn btn-sec" for="mn-foto">' + ICON.galeria + 'Anexar foto</label></div></div>' +
       '<div id="mn-foto-cheia" class="foto-prev" hidden><img id="mn-foto-prev" alt="Prévia"><button type="button" class="btn btn-sec btn-sm trocar" id="mn-foto-tirar">Remover</button></div>' +
       '<input class="foto-input" type="file" id="mn-foto" accept="image/*"></div></div>' +
-      '<datalist id="dl-mun"></datalist><datalist id="dl-local"></datalist><datalist id="dl-secao"></datalist>' +
       '<button class="btn btn-primario btn-xl" type="submit" id="mn-enviar" style="margin-top:8px">' + ICON.check + 'Lançar como confirmado</button></form></div>';
-    $('#mn-mun').value = String(dados.config.municipio_principal || 'ANCHIETA').toUpperCase();
-    $('#mn-mun').addEventListener('input', atualizarListasManual);
-    $('#mn-local').addEventListener('input', atualizarListasManual);
-    $('#mn-secao').addEventListener('input', function () { this.value = this.value.replace(/\D/g, ''); });
-    $('#mn-votos').addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 4); });
+    $('#mn-mun').addEventListener('change', function () {
+      $('#mn-mun-novo').hidden = this.value !== NOVO;
+      if (this.value === NOVO) $('#mn-mun-novo').focus();
+      $('#mn-local').value = ''; atualizarListasManual('', '');
+    });
+    $('#mn-mun-novo').addEventListener('input', atualizarResumoManual);
+    $('#mn-local').addEventListener('change', function () {
+      $('#mn-local-novo').hidden = this.value !== NOVO;
+      if (this.value === NOVO) $('#mn-local-novo').focus();
+      atualizarListasManual();
+    });
+    $('#mn-local-novo').addEventListener('input', atualizarResumoManual);
+    $('#mn-secao').addEventListener('input', function () { this.value = this.value.replace(/\D/g, ''); atualizarResumoManual(); });
+    App.campoVotos($('#mn-votos'), atualizarResumoManual);
     $('#mn-foto').addEventListener('change', function (e) {
       var f = e.target.files[0]; e.target.value = ''; if (!f) return;
       App.comprimirFoto(f).then(function (d) { fotoManual = d; $('#mn-foto-prev').src = d; $('#mn-foto-vazia').hidden = true; $('#mn-foto-cheia').hidden = false; })
@@ -427,33 +444,97 @@
     $('#form-manual').addEventListener('submit', enviarManual);
     atualizarListasManual();
   }
-  function atualizarListasManual() {
-    var mun = Core.norm($('#mn-mun').value), nomeL = Core.norm($('#mn-local').value);
-    $('#dl-mun').innerHTML = municipiosConhecidos().map(function (m) { return '<option value="' + h(m) + '">'; }).join('');
-    var locs = dados.locais.filter(function (l) { return Core.norm(l.municipio) === mun; }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
-    $('#dl-local').innerHTML = locs.map(function (l) { return '<option value="' + h(l.nome) + '">'; }).join('');
-    var loc = locs.filter(function (l) { return Core.norm(l.nome) === nomeL; })[0];
+  /* lê o que está preenchido no formulário */
+  function dadosManual() {
+    var munSel = $('#mn-mun').value, locSel = $('#mn-local').value;
+    var municipio = (munSel === NOVO ? $('#mn-mun-novo').value : munSel).trim().toUpperCase();
+    var localObj = null, localNome = '';
+    if (locSel === NOVO) localNome = $('#mn-local-novo').value.trim().toUpperCase();
+    else if (locSel) { localObj = dados.locais.filter(function (l) { return l.id === locSel; })[0] || null; localNome = localObj ? localObj.nome : ''; }
+    return { municipio: municipio, localObj: localObj, local: localNome, novoLocal: locSel === NOVO, secao: $('#mn-secao').value.trim(), votos: App.valorVotos($('#mn-votos').value) };
+  }
+  function atualizarListasManual(prefMun, prefLocal) {
+    var selM = $('#mn-mun'), atualM = (typeof prefMun === 'string' && prefMun) || selM.value || String(dados.config.municipio_principal || 'ANCHIETA').toUpperCase();
+    var muns = municipiosConhecidos();
+    selM.innerHTML = muns.map(function (m) { return '<option value="' + h(m) + '">' + h(m) + '</option>'; }).join('') + '<option value="' + NOVO + '">＋ Outro município…</option>';
+    selM.value = (atualM === NOVO || muns.indexOf(atualM) >= 0) ? atualM : muns[0];
+    $('#mn-mun-novo').hidden = selM.value !== NOVO;
+    var selL = $('#mn-local'), atualL = typeof prefLocal === 'string' ? prefLocal : selL.value;
+    var locs = selM.value === NOVO ? [] : dados.locais.filter(function (l) { return l.municipio === selM.value; }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+    selL.innerHTML = '<option value="">— Nenhum (total do município) —</option>' + locs.map(function (l) { return '<option value="' + h(l.id) + '">' + h(l.nome) + '</option>'; }).join('') +
+      '<option value="' + NOVO + '">＋ Novo local…</option>';
+    selL.value = (atualL === NOVO || locs.some(function (l) { return l.id === atualL; })) ? atualL : '';
+    $('#mn-local-novo').hidden = selL.value !== NOVO;
+    var loc = locs.filter(function (l) { return l.id === selL.value; })[0];
     $('#dl-secao').innerHTML = loc ? dados.secoes.filter(function (s) { return s.local_id === loc.id; }).map(function (s) { return '<option value="' + h(s.numero) + '">'; }).join('') : '';
+    var semLocal = !selL.value || (selL.value === NOVO && !$('#mn-local-novo').value.trim());
+    $('#mn-secao').disabled = !selL.value;
+    if (!selL.value) $('#mn-secao').value = '';
+    $('#mn-secao').placeholder = selL.value ? 'Deixe vazio para lançar o total do local' : 'Escolha um local para informar a seção';
+    atualizarResumoManual();
+  }
+  function atualizarResumoManual() {
+    var d = dadosManual(), el = $('#mn-resumo');
+    if (!el) return;
+    var oque;
+    if (!d.municipio) oque = 'Escolha o município.';
+    else if (!d.local) oque = 'Será lançado o <strong>TOTAL do município ' + h(d.municipio) + '</strong>' + (d.novoLocal ? ' (digite o nome do novo local)' : '') + '.';
+    else if (!d.secao) oque = 'Será lançado o <strong>TOTAL do local ' + h(d.local) + '</strong> (' + h(d.municipio) + '), sem detalhar seções.';
+    else oque = 'Será lançada a <strong>seção ' + h(d.secao) + '</strong> de <strong>' + h(d.local) + '</strong> (' + h(d.municipio) + ').';
+    el.innerHTML = ICON.info + '<div>' + oque + (isNaN(d.votos) ? '' : ' Votos: <strong>' + App.n(d.votos) + '</strong>.') + '</div>';
   }
   function enviarManual(e) {
     e.preventDefault();
-    var d = { municipio: $('#mn-mun').value.trim(), local: $('#mn-local').value.trim(), secao: $('#mn-secao').value.trim(), votos: $('#mn-votos').value.trim(),
+    var f = dadosManual();
+    if (!f.municipio) return App.toast('Informe o município.', 'erro');
+    if (f.novoLocal && !f.local) return App.toast('Digite o nome do novo local (ou escolha "Nenhum").', 'erro');
+    if (isNaN(f.votos)) return App.toast('Informe a quantidade de votos.', 'erro');
+    var d = { municipio: f.municipio, local: f.local, secao: f.secao, votos: String(f.votos),
       nome: $('#mn-nome').value.trim(), telefone: $('#mn-tel').value, obs: $('#mn-obs').value.trim(), foto: fotoManual, client_id: App.uuid() };
-    if (!d.municipio || !d.local || !d.secao || d.votos === '') return App.toast('Preencha município, local, seção e votos.', 'erro');
-    // a seção já tem envio?
-    var loc = dados.locais.filter(function (l) { return Core.norm(l.municipio) === Core.norm(d.municipio) && Core.norm(l.nome) === Core.norm(d.local); })[0];
-    var sec = loc ? dados.secoes.filter(function (s) { return s.local_id === loc.id && s.numero === String(Number(d.secao)); })[0] : null;
-    var existentes = sec ? dados.lancamentos.filter(function (l) { return l.secao_id === sec.id && (l.status === 'PENDENTE' || l.status === 'VALIDADO'); }) : [];
-    var novo = !loc ? 'O local <b>' + h(d.local.toUpperCase()) + '</b> será criado em ' + h(d.municipio.toUpperCase()) + '. ' : (!sec ? 'A seção ' + h(d.secao) + ' será criada neste local. ' : '');
-    var aviso = existentes.length ? 'Esta seção já tem ' + existentes.length + ' envio(s) (' + existentes.map(function (l) { return App.n(l.votos) + ' votos'; }).join(', ') + '). Eles serão marcados como <b>substituídos</b>. ' : '';
-    var p = (novo || aviso) ? App.confirmar('Confirmar lançamento', novo + aviso + 'Lançar <b>' + App.n(Number(d.votos)) + ' votos</b> na seção ' + h(d.secao) + '?', 'Lançar') : Promise.resolve(true);
-    p.then(function (ok) {
+    var ativos = function (l) { return l.status === 'PENDENTE' || l.status === 'VALIDADO'; };
+    var doMun = function (l) { return Core.norm(l.municipio) === Core.norm(f.municipio); };
+    var soma = function (ls) { return ls.reduce(function (a, l) { return a + (l.votos || 0); }, 0); };
+    var msgs = [], alvo;
+    if (!f.local) {
+      alvo = 'o <b>total do município ' + h(f.municipio) + '</b>';
+      var totAnt = dados.lancamentos.filter(function (l) { return ativos(l) && doMun(l) && Core.ehTotal(l) && !l.local_id; });
+      if (totAnt.length) msgs.push('Já existe um total informado para ' + h(f.municipio) + ' (' + App.n(soma(totAnt)) + ' votos). Ele será <b>substituído</b>.');
+      var det = dados.lancamentos.filter(function (l) { return ativos(l) && doMun(l) && !(Core.ehTotal(l) && !l.local_id); });
+      if (det.length) msgs.push('<span style="color:#b34700"><b>Atenção:</b> já existem ' + det.length + ' lançamento(s) por local/seção em ' + h(f.municipio) + ' somando ' + App.n(soma(det)) + ' votos. O total será <b>somado</b> a eles. Se o total já inclui esses votos, rejeite os outros em "Todos os envios".</span>');
+    } else if (!f.secao) {
+      alvo = 'o <b>total do local ' + h(f.local) + '</b> (' + h(f.municipio) + ')';
+      if (f.localObj) {
+        var totL = dados.lancamentos.filter(function (l) { return ativos(l) && l.secao_id === 'TOT-' + f.localObj.id; });
+        if (totL.length) msgs.push('Já existe um total para este local (' + App.n(soma(totL)) + ' votos). Ele será <b>substituído</b>.');
+        var secL = dados.lancamentos.filter(function (l) { return ativos(l) && l.local_id === f.localObj.id && !Core.ehTotal(l); });
+        if (secL.length) msgs.push('<span style="color:#b34700"><b>Atenção:</b> este local já tem ' + secL.length + ' seção(ões) lançada(s) somando ' + App.n(soma(secL)) + ' votos. O total será <b>somado</b> a elas.</span>');
+      } else msgs.push('O local <b>' + h(f.local) + '</b> será criado em ' + h(f.municipio) + '.');
+      var totMun2 = dados.lancamentos.filter(function (l) { return ativos(l) && doMun(l) && Core.ehTotal(l) && !l.local_id; });
+      if (totMun2.length) msgs.push('<span style="color:#b34700"><b>Atenção:</b> ' + h(f.municipio) + ' tem um total do município informado (' + App.n(soma(totMun2)) + ' votos). Este total do local será <b>somado</b> a ele.</span>');
+    } else {
+      alvo = 'a <b>seção ' + h(f.secao) + '</b> de ' + h(f.local) + ' (' + h(f.municipio) + ')';
+      if (!f.localObj) msgs.push('O local <b>' + h(f.local) + '</b> será criado em ' + h(f.municipio) + '.');
+      var sec = f.localObj ? dados.secoes.filter(function (s) { return s.local_id === f.localObj.id && s.numero === String(Number(f.secao)); })[0] : null;
+      if (f.localObj && !sec) msgs.push('A seção ' + h(f.secao) + ' será criada neste local.');
+      var exist = sec ? dados.lancamentos.filter(function (l) { return l.secao_id === sec.id && ativos(l); }) : [];
+      var totLoc = f.localObj ? dados.lancamentos.filter(function (l) { return ativos(l) && l.secao_id === 'TOT-' + f.localObj.id; }) : [];
+      if (totLoc.length) msgs.push('<span style="color:#b34700"><b>Atenção:</b> este local tem um total informado de ' + App.n(soma(totLoc)) + ' votos. A seção será <b>somada</b> a ele. Se o total já inclui esta seção, rejeite o total em "Todos os envios".</span>');
+      var totMun = dados.lancamentos.filter(function (l) { return ativos(l) && doMun(l) && Core.ehTotal(l) && !l.local_id; });
+      if (totMun.length) msgs.push('<span style="color:#b34700"><b>Atenção:</b> ' + h(f.municipio) + ' tem um total do município informado (' + App.n(soma(totMun)) + ' votos). A seção será <b>somada</b> a ele.</span>');
+      if (exist.length) msgs.push('Esta seção já tem ' + exist.length + ' envio(s) (' + exist.map(function (l) { return App.n(l.votos) + ' votos'; }).join(', ') + '). Eles serão marcados como <b>substituídos</b>.');
+    }
+    App.confirmar('Confirmar lançamento', 'Lançar <b>' + App.n(f.votos) + ' votos</b> como ' + alvo + '?' + (msgs.length ? '<br><br>' + msgs.join('<br><br>') : ''), 'Lançar').then(function (ok) {
       if (!ok) return;
       var b = $('#mn-enviar'); App.carregando(b, true, 'Lançando…');
       chamar('apuracao.lancar', d).then(function () {
-        App.toast('Lançado: seção ' + d.secao + ' com ' + App.n(Number(d.votos)) + ' votos.', 'ok');
+        App.toast('Lançado: ' + App.n(f.votos) + ' votos (' + (f.secao ? 'seção ' + f.secao : (f.local ? 'total do local' : 'total de ' + f.municipio)) + ').', 'ok');
         $('#mn-secao').value = ''; $('#mn-votos').value = ''; $('#mn-obs').value = ''; $('#mn-foto-tirar').click();
-        return carregar(true).then(atualizarListasManual);
+        return carregar(true).then(function () {
+          // já deixa selecionados o município e o local usados (inclusive se foram criados agora)
+          var nl = f.local ? dados.locais.filter(function (l) { return Core.norm(l.municipio) === Core.norm(f.municipio) && Core.norm(l.nome) === Core.norm(f.local); })[0] : null;
+          $('#mn-mun-novo').value = ''; $('#mn-local-novo').value = '';
+          atualizarListasManual(municipiosConhecidos().filter(function (m) { return Core.norm(m) === Core.norm(f.municipio); })[0] || f.municipio, nl ? nl.id : '');
+        });
       }).catch(function (e2) { App.toast(e2.message, 'erro'); }).then(function () { App.carregando(b, false); });
     });
   }
@@ -486,8 +567,9 @@
       '<div class="campo"><label for="pg-num">Número</label><input class="input" id="pg-num" value="' + h(c.candidato_numero) + '"></div></div>' +
       '<div class="grid-2"><div class="campo"><label for="pg-cargo">Cargo</label><input class="input" id="pg-cargo" value="' + h(c.cargo) + '"></div>' +
       '<div class="campo"><label for="pg-partido">Partido</label><input class="input" id="pg-partido" value="' + h(c.partido) + '"></div></div>' +
-      '<div class="grid-2"><div class="campo"><label for="pg-mun">Município dos fiscais</label><input class="input" id="pg-mun" list="pg-dl-mun" value="' + h(c.municipio_principal) + '"><datalist id="pg-dl-mun">' + municipiosConhecidos().map(function (m) { return '<option value="' + h(m) + '">'; }).join('') + '</datalist><div class="ajuda">Os fiscais só veem os locais deste município.</div></div>' +
-      '<div class="campo"><label for="pg-max">Alerta de votos por seção</label><input class="input" id="pg-max" inputmode="numeric" value="' + h(c.alerta_votos_max) + '"><div class="ajuda">O fiscal é avisado se digitar um valor acima deste.</div></div></div>' +
+      '<div class="grid-2"><div class="campo"><label for="pg-mun">Município dos fiscais</label><input class="input" id="pg-mun" list="pg-dl-mun" value="' + h(c.municipio_principal) + '"><datalist id="pg-dl-mun">' + municipiosConhecidos().map(function (m) { return '<option value="' + h(m) + '">'; }).join('') + '</datalist><div class="ajuda">Os fiscais só veem os locais deste município.</div></div></div>' +
+      '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px;margin-top:4px"><div><b>Alerta de votos acima do esperado</b><span>Avisa o fiscal, na tela de conferência, quando ele digitar mais votos que o limite.</span></div><label class="switch"><input type="checkbox" id="pg-alerta"' + (String(c.alerta_votos_ativo).toUpperCase() !== 'FALSE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
+      '<div class="campo" id="pg-max-campo" style="max-width:280px"><label for="pg-max">Limite de votos por seção</label><input class="input" id="pg-max" inputmode="numeric" value="' + h(App.formatarVotos(c.alerta_votos_max)) + '"><div class="ajuda">Acima deste número o fiscal recebe o aviso.</div></div>' +
       '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px;margin-top:4px"><div><b>Foto do BU obrigatória</b><span>Exigir a foto no envio do fiscal.</span></div><label class="switch"><input type="checkbox" id="pg-foto"' + (String(c.foto_obrigatoria).toUpperCase() !== 'FALSE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<button class="btn btn-azul" type="submit" id="pg-salvar" style="margin-top:12px">Salvar alterações</button></form>' +
       '<div><section class="card"><div class="card-titulo"><h3>Links para compartilhar</h3></div>' +
@@ -511,12 +593,20 @@
         }).catch(function (e) { chk.checked = !abrir; App.toast(e.message, 'erro'); });
       });
     };
+    App.campoVotos($('#pg-max'));
+    var ajustarAlerta = function () {
+      var on = $('#pg-alerta').checked;
+      $('#pg-max').disabled = !on;
+      $('#pg-max-campo').style.opacity = on ? '' : '.5';
+    };
+    $('#pg-alerta').onchange = ajustarAlerta; ajustarAlerta();
     $('#form-config').onsubmit = function (e) {
       e.preventDefault();
       var b = $('#pg-salvar'); App.carregando(b, true, 'Salvando…');
       chamar('apuracao.salvarConfig', { valores: {
         titulo: $('#pg-titulo').value, candidato_nome: $('#pg-nome').value, candidato_numero: $('#pg-num').value,
         cargo: $('#pg-cargo').value, partido: $('#pg-partido').value, municipio_principal: $('#pg-mun').value.trim().toUpperCase(),
+        alerta_votos_ativo: $('#pg-alerta').checked ? 'TRUE' : 'FALSE',
         alerta_votos_max: $('#pg-max').value.replace(/\D/g, '') || '400', foto_obrigatoria: $('#pg-foto').checked ? 'TRUE' : 'FALSE'
       } }).then(function () { App.toast('Configurações salvas.', 'ok'); return recarregarParametros(); })
         .catch(function (e2) { App.toast(e2.message, 'erro'); App.carregando(b, false); });

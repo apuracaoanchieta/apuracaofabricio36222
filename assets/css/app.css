@@ -128,7 +128,7 @@ textarea.input { min-height: 110px; resize: vertical; }
 .votos-box .cand b { display: block; font-size: 15px; color: var(--azul-esc); font-weight: 800; }
 .votos-box .cand span { font-size: 12px; color: var(--texto-2); font-weight: 600; }
 .votos-input {
-  width: 128px; font-size: 38px; font-weight: 800; text-align: center; border: 0; outline: none;
+  width: 190px; min-width: 0; font-size: 38px; font-weight: 800; text-align: center; border: 0; outline: none;
   color: var(--laranja); background: transparent; letter-spacing: 1px; padding: 4px 0; font-variant-numeric: tabular-nums;
 }
 .votos-input::placeholder { color: #c9d7df; }
@@ -591,3 +591,12 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
   .filtro .input { font-size: 14px; min-height: 42px; }
   .filtro-legenda { font-size: 11.5px; gap: 10px; }
 }
+
+.votos-box .cand { min-width: 110px; }
+@media (max-width: 420px) {
+  .votos-box { padding-left: 14px; gap: 8px; }
+  .votos-input { width: 160px; font-size: 32px; }
+}
+@media (max-width: 350px) { .votos-input { width: 130px; font-size: 27px; } }
+.chip.chip-total { min-width: 64px; background: var(--azul-noite); color: #fff; letter-spacing: .5px; }
+.chip.chip-total.PENDENTE { background: repeating-linear-gradient(135deg, var(--pendente) 0 5px, #f47a1d 5px 9px); }

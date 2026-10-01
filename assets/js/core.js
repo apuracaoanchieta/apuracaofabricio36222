@@ -36,6 +36,7 @@ var Core = (function () {
     ['municipio_principal', 'ANCHIETA', 'Município onde atuam os fiscais'],
     ['recebimento_aberto', 'TRUE', 'TRUE = fiscais podem enviar; FALSE = envio bloqueado'],
     ['foto_obrigatoria', 'TRUE', 'Exigir foto do BU no envio do fiscal'],
+    ['alerta_votos_ativo', 'TRUE', 'TRUE = avisa o fiscal quando digitar votos acima do limite; FALSE = sem aviso'],
     ['alerta_votos_max', '400', 'Avisa o fiscal se digitar mais votos que isto em uma seção'],
     ['pasta_fotos_id', '', 'ID da pasta do Google Drive com as fotos (preenchido automaticamente)']
   ];
@@ -296,7 +297,7 @@ var Core = (function () {
     var secao = find(mapSecoes(db), function (s) { return s.id === str(req.secao_id) && s.local_id === local.id && s.ativo; });
     if (!secao) throw erro('Seção inválida para este local. Atualize a página.');
     var votos = int(req.votos);
-    if (isNaN(votos) || votos < 0 || votos > 9999) throw erro('Quantidade de votos inválida.');
+    if (isNaN(votos) || votos < 0 || votos > 999999) throw erro('Quantidade de votos inválida.');
     var foto = str(req.foto);
     if (bool(cfg.foto_obrigatoria) && !foto) throw erro('A foto do boletim de urna é obrigatória.');
     if (foto && !/^data:image\/(jpeg|png|webp);base64,/.test(foto)) throw erro('Formato de foto inválido.');
@@ -407,7 +408,7 @@ var Core = (function () {
       if (!l) throw erro('Envio não encontrado.');
       if (req.votos !== undefined && req.votos !== null && req.votos !== '') {
         var v = int(req.votos);
-        if (isNaN(v) || v < 0 || v > 9999) throw erro('Quantidade de votos inválida.');
+        if (isNaN(v) || v < 0 || v > 999999) throw erro('Quantidade de votos inválida.');
         l.votos = v;
       }
       l.status = STATUS.VALIDADO;
@@ -467,26 +468,35 @@ var Core = (function () {
   ACOES['apuracao.lancar'] = function (db, req) {
     var u = exigeApuracao(db, req);
     var votos = int(req.votos);
-    if (isNaN(votos) || votos < 0 || votos > 9999) throw erro('Quantidade de votos inválida.');
+    if (isNaN(votos) || votos < 0 || votos > 999999) throw erro('Quantidade de votos inválida.');
     var foto = str(req.foto);
     if (foto && !/^data:image\/(jpeg|png|webp);base64,/.test(foto)) throw erro('Formato de foto inválido.');
     var cfg = lerConfig(db);
     var fotoId = foto ? db.saveFoto(foto, 'BU_manual_' + db.stamp().replace(/\D/g, '') + '.jpg', cfg) : '';
     return db.lock(function () {
-      var local = obterOuCriarLocal(db, req.municipio, req.local);
-      var secao = obterOuCriarSecao(db, local.id, req.secao);
+      var municipio = str(req.municipio).toUpperCase();
+      if (!norm(municipio)) throw erro('Informe o município.');
+      var temLocal = !!norm(req.local), temSecao = str(req.secao) !== '';
+      if (temSecao && !temLocal) throw erro('Para lançar uma seção, informe também o local de votação.');
+      var local = temLocal ? obterOuCriarLocal(db, municipio, req.local) : null;
+      var secao = temSecao ? obterOuCriarSecao(db, local.id, req.secao) : null;
+      // Sem seção: é um TOTAL informado (do local ou do município inteiro).
+      // Um novo total do mesmo local/município substitui o anterior.
+      var secaoId = secao ? secao.id : (local ? 'TOT-' + local.id : 'TOT-M-' + norm(municipio).replace(/[^A-Z0-9]+/g, '_'));
       var novo = {
         id: 'M' + db.uuid().replace(/-/g, '').substr(0, 10).toUpperCase(), client_id: str(req.client_id).substr(0, 60),
         recebido_em: db.stamp(), origem: 'APURACAO', nome: str(req.nome).substr(0, 80) || ('Lançado por ' + u.usuario),
-        telefone: digits(req.telefone).substr(0, 13), municipio: local.municipio, local_id: local.id, local: local.nome,
-        secao_id: secao.id, secao: secao.numero, votos: votos, votos_informados: votos, foto_id: fotoId,
+        telefone: digits(req.telefone).substr(0, 13), municipio: local ? local.municipio : municipio,
+        local_id: local ? local.id : '', local: local ? local.nome : '',
+        secao_id: secaoId, secao: secao ? secao.numero : '', votos: votos, votos_informados: votos, foto_id: fotoId,
         status: STATUS.VALIDADO, validado_por: u.usuario, validado_em: db.stamp(), obs: str(req.obs).substr(0, 200)
       };
       db.append('LANCAMENTOS', rowLanc(novo));
       var lancs = mapLancamentos(db);
       var gravado = find(lancs, function (x) { return x.id === novo.id; });
       descartarOutros(db, lancs, gravado, u.usuario);
-      log(db, u.usuario, 'LANCAMENTO_MANUAL', novo.id + ' ' + local.municipio + ' / ' + local.nome + ' seção ' + secao.numero + ' votos ' + votos);
+      log(db, u.usuario, 'LANCAMENTO_MANUAL', novo.id + ' ' + novo.municipio + ' / ' + (novo.local || 'TOTAL DO MUNICÍPIO') +
+        (secao ? ' seção ' + secao.numero : ' (total)') + ' votos ' + votos);
       return { id: novo.id };
     });
   };
@@ -701,7 +711,8 @@ var Core = (function () {
   return {
     SCHEMA: SCHEMA, STATUS: STATUS, PERFIS: PERFIS, SEED: SEED, CONFIG_PADRAO: CONFIG_PADRAO,
     handle: handle, instalar: instalar, resolverUrnas: resolverUrnas,
-    sha256: sha256, hmac: hmac, norm: norm, int: int
+    sha256: sha256, hmac: hmac, norm: norm, int: int,
+    ehTotal: function (l) { return /^TOT-/.test(String(l && l.secao_id || '')); }
   };
 })();
 

@@ -44,7 +44,7 @@ var Painel = (function () {
 
     var porLocal = {};
     function linhaLocal(id, nome, mun) {
-      if (!porLocal[id]) porLocal[id] = { id: id, nome: nome, municipio: mun, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, secoes: [] };
+      if (!porLocal[id]) porLocal[id] = { id: id, nome: nome, municipio: mun, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, totalInformado: 0, secoes: [] };
       return porLocal[id];
     }
     var urnaPorSecao = {};
@@ -60,9 +60,19 @@ var Painel = (function () {
       r.secoes.push({ id: s.id, numero: s.numero, ativo: s.ativo, urna: u || null });
       if (s.ativo) { r.total++; totalUrnas++; }
     });
-    var st = { votosVal: 0, votosPen: 0, urnasVal: 0, urnasPen: 0, totalUrnas: totalUrnas, eventos: [] };
+    var st = { votosVal: 0, votosPen: 0, urnasVal: 0, urnasPen: 0, totalUrnas: totalUrnas, votosTotais: 0, totais: 0, eventos: [] };
     dados.urnas.forEach(function (u) {
       if (!noFiltro(u.municipio) || !noLocal(u.local_id)) return;
+      if (Core.ehTotal(u)) {
+        // total informado sem seção: soma votos, não conta como urna
+        var rt = u.local_id ? (porLocal[u.local_id] || linhaLocal(u.local_id, u.local, u.municipio))
+          : linhaLocal(u.secao_id, 'TOTAL DE ' + u.municipio + ' (informado)', u.municipio);
+        rt.totalInformado += u.votos; rt.totalStatus = u.status;
+        if (u.status === 'VALIDADO') { rt.votosVal += u.votos; st.votosVal += u.votos; } else { rt.votosPen += u.votos; st.votosPen += u.votos; }
+        st.votosTotais += u.votos; st.totais++;
+        st.eventos.push(u);
+        return;
+      }
       var r = porLocal[u.local_id] || linhaLocal(u.local_id, u.local, u.municipio);
       if (!r.secoes.some(function (s) { return s.id === u.secao_id; })) r.secoes.push({ id: u.secao_id, numero: u.secao, ativo: true, urna: u });
       if (u.status === 'VALIDADO') { r.val++; r.votosVal += u.votos; st.urnasVal++; st.votosVal += u.votos; }
@@ -78,16 +88,17 @@ var Painel = (function () {
     });
     st.locais = Object.keys(porLocal).map(function (k) { return porLocal[k]; });
     st.apuradas = st.urnasVal + st.urnasPen;
-    st.media = st.apuradas ? (st.votosVal + st.votosPen) / st.apuradas : 0;
-    st.projecao = st.apuradas >= 5 ? Math.round(st.media * st.totalUrnas) : null;
+    st.media = st.apuradas ? (st.votosVal + st.votosPen - st.votosTotais) / st.apuradas : 0;
+    st.projecao = st.apuradas >= 5 ? Math.round(st.media * st.totalUrnas) + st.votosTotais : null;
 
     // outros municípios (fora do filtro atual)
     var outros = {};
     dados.urnas.forEach(function (u) {
       if (noFiltro(u.municipio)) return;
       var m = u.municipio || '—';
-      outros[m] = outros[m] || { municipio: m, votos: 0, urnas: 0 };
-      outros[m].votos += u.votos; outros[m].urnas++;
+      outros[m] = outros[m] || { municipio: m, votos: 0, urnas: 0, totais: 0 };
+      outros[m].votos += u.votos;
+      if (Core.ehTotal(u)) outros[m].totais++; else outros[m].urnas++;
     });
     st.outros = Object.keys(outros).map(function (k) { return outros[k]; });
     return st;
@@ -176,7 +187,12 @@ var Painel = (function () {
       if (st.outros.length && municipio !== '__TODOS__') {
         var tot = st.outros.reduce(function (a, o) { return a + o.votos; }, 0);
         outros.innerHTML = '<div class="aviso aviso-info">' + ICON.info + '<div><b>Outros municípios: ' + App.n(tot) + ' votos</b>' +
-          st.outros.map(function (o) { return h(o.municipio) + ' ' + App.n(o.votos) + ' (' + o.urnas + ' urna' + (o.urnas > 1 ? 's' : '') + ')'; }).join(' · ') +
+          st.outros.map(function (o) {
+            var partes = [];
+            if (o.urnas) partes.push(o.urnas + ' urna' + (o.urnas > 1 ? 's' : ''));
+            if (o.totais) partes.push(o.totais > 1 ? o.totais + ' totais informados' : 'total informado');
+            return h(o.municipio) + ' ' + App.n(o.votos) + ' (' + partes.join(' + ') + ')';
+          }).join(' · ') +
           '. Escolha "Todos os municípios" para somar.</div></div>';
       } else outros.innerHTML = '';
 
@@ -187,7 +203,8 @@ var Painel = (function () {
         '<div class="det">' + (st.votosPen ? '+ ' + App.n(st.votosPen) + ' em conferência = ' + App.n(st.votosVal + st.votosPen) + ' no total' : 'nenhum voto em conferência') + '</div></div>';
       k += '<div class="kpi"><div class="rot">Urnas apuradas</div><div class="val num">' + st.apuradas + ' <span style="font-size:18px;color:var(--texto-3)">/ ' + st.totalUrnas + '</span></div>' +
         '<div class="progresso" style="margin-top:8px" title="' + st.urnasVal + ' confirmadas, ' + st.urnasPen + ' em conferência"><i class="p-val" style="width:' + (st.totalUrnas ? st.urnasVal / st.totalUrnas * 100 : 0) + '%"></i><i class="p-pen" style="width:' + (st.totalUrnas ? st.urnasPen / st.totalUrnas * 100 : 0) + '%"></i></div>' +
-        '<div class="det">' + App.pct(st.apuradas, st.totalUrnas) + ' · ' + st.urnasVal + ' confirmadas · ' + st.urnasPen + ' em conferência</div></div>';
+        '<div class="det">' + (st.totalUrnas ? App.pct(st.apuradas, st.totalUrnas) + ' · ' + st.urnasVal + ' confirmadas · ' + st.urnasPen + ' em conferência' : (st.votosTotais ? 'sem urnas cadastradas — só total informado' : 'nenhuma urna cadastrada')) +
+        (st.totalUrnas && st.votosTotais ? ' · + total informado de ' + App.n(st.votosTotais) + ' votos' : '') + '</div></div>';
       if (partido) {
         k += '<div class="kpi"><div class="rot"><i style="background:repeating-linear-gradient(135deg,#e86100 0 3px,#ff9a4d 3px 6px);width:12px;height:12px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:5px"></i>Em conferência</div><div class="val num" style="color:#b34700">' + App.n(st.votosPen) + '</div><div class="det">' + st.urnasPen + ' urna' + (st.urnasPen === 1 ? '' : 's') + ' aguardando conferência</div></div>';
       } else {
@@ -195,7 +212,7 @@ var Painel = (function () {
         k += '<div class="kpi clicavel" id="kpi-pend" title="Abrir conferência"><div class="rot">Aguardando conferência</div><div class="val num" style="color:' + (aguard ? '#b34700' : 'var(--ok)') + '">' + aguard + '</div><div class="det">' + (aguard ? 'envios para conferir ' + '→' : 'tudo conferido') + '</div></div>';
       }
       k += '<div class="kpi"><div class="rot">Média por urna</div><div class="val num">' + (st.apuradas ? App.n(Math.round(st.media)) : '—') + '</div><div class="det">' +
-        (st.projecao !== null ? 'Se a média se mantiver: ~' + App.n(st.projecao) + ' votos em ' + st.totalUrnas + ' urnas' : 'projeção após 5 urnas') + '</div></div>';
+        (st.projecao !== null ? 'Se a média se mantiver: ~' + App.n(st.projecao) + ' votos em ' + st.totalUrnas + ' urnas' + (st.votosTotais ? ' + totais informados' : '') : (st.apuradas ? 'projeção após 5 urnas' : (st.votosTotais ? 'só totais informados, sem urnas' : 'projeção após 5 urnas'))) + '</div></div>';
       $('#p-kpis', raiz).innerHTML = k;
       var kp = $('#kpi-pend', raiz); if (kp && opcoes.aoClicarPendentes) kp.onclick = opcoes.aoClicarPendentes;
       $('#p-urnas-txt', raiz).textContent = App.pct(st.apuradas, st.totalUrnas) + ' apuradas';
@@ -314,10 +331,10 @@ var Painel = (function () {
 
     function desenharMapa(st) {
       var ls = st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); })
-        .filter(function (l) { return l.secoes.some(passaSituacao); });
+        .filter(function (l) { return l.secoes.some(passaSituacao) || (l.totalInformado && (situacao === 'TODAS' || situacao === l.totalStatus)); });
       var dups = opcoes.duplicadas ? opcoes.duplicadas() : {};
       $('#p-mapa', raiz).innerHTML = ls.length ? ls.map(function (l) {
-        return '<div class="mapa-local"><div class="cab"><b>' + h(l.nome) + '</b><span>' + (l.val + l.pen) + '/' + l.total + '</span></div><div class="chips">' +
+        return '<div class="mapa-local"><div class="cab"><b>' + h(l.nome) + '</b><span>' + (l.total ? (l.val + l.pen) + '/' + l.total : 'total') + '</span></div><div class="chips">' +
           l.secoes.filter(passaSituacao).map(function (s) {
             var u = s.urna, cls = u ? u.status : '', tit = 'Seção ' + s.numero;
             if (u) tit += ' · ' + App.n(u.votos) + ' votos · ' + (u.status === 'VALIDADO' ? 'confirmado' : 'em conferência') + ' · ' + App.hora(u.recebido_em);
@@ -325,27 +342,27 @@ var Painel = (function () {
             var tag = opcoes.aoClicarSecao && u ? 'button' : 'span';
             return '<' + tag + ' class="chip ' + cls + (dups[s.id] ? ' dup' : '') + (s.ativo ? '' : ' inativa') + '" title="' + h(tit) + '"' + (tag === 'button' ? ' data-secao="' + h(s.id) + '"' : '') + '>' + h(s.numero) +
               (u ? '<small class="num">' + App.n(u.votos) + '</small>' : '<small>—</small>') + '</' + tag + '>';
-          }).join('') + '</div></div>';
+          }).join('') + (l.totalInformado ? '<span class="chip chip-total ' + (l.totalStatus || '') + '" title="Total informado sem detalhar seções">TOTAL<small class="num">' + App.n(l.totalInformado) + '</small></span>' : '') + '</div></div>';
       }).join('') : '<div class="vazio">' + (situacao !== 'TODAS' ? 'Nenhuma urna nessa situação.' : 'Nenhuma seção cadastrada para este filtro.') + '</div>';
       if (opcoes.aoClicarSecao) App.$$('[data-secao]', raiz).forEach(function (b) { b.onclick = function () { opcoes.aoClicarSecao(b.dataset.secao); }; });
     }
 
     function desenharTabela(st) {
       var ls = st.locais.slice().sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); })
-        .filter(function (l) { return l.secoes.some(passaSituacao); });
+        .filter(function (l) { return l.secoes.some(passaSituacao) || (l.totalInformado && (situacao === 'TODAS' || situacao === l.totalStatus)); });
       var t = { total: 0, val: 0, pen: 0, vv: 0, vp: 0 };
       var corpo = ls.map(function (l) {
         t.total += l.total; t.val += l.val; t.pen += l.pen; t.vv += l.votosVal; t.vp += l.votosPen;
         var ap = l.val + l.pen;
-        return '<tr><td data-l="Local"><b>' + h(l.nome) + '</b></td>' +
-          '<td data-l="Urnas" class="r">' + ap + '/' + l.total + '</td>' +
+        return '<tr><td data-l="Local"><b>' + h(l.nome) + '</b>' + (l.totalInformado ? '<div class="tiny muted">inclui total informado: ' + App.n(l.totalInformado) + '</div>' : '') + '</td>' +
+          '<td data-l="Urnas" class="r">' + (l.total ? ap + '/' + l.total : '—') + '</td>' +
           '<td data-l="Progresso"><div class="mini-barra" title="' + App.pct(ap, l.total) + '"><i style="width:' + (l.total ? l.val / l.total * 100 : 0) + '%;background:' + COR_VAL + '"></i><i class="p-pen" style="width:' + (l.total ? l.pen / l.total * 100 : 0) + '%;background:repeating-linear-gradient(135deg,#e86100 0 3px,#ff9a4d 3px 6px)"></i></div></td>' +
           '<td data-l="Confirmados" class="r"><b>' + App.n(l.votosVal) + '</b></td>' +
           '<td data-l="Em conferência" class="r" style="color:#b34700">' + (l.votosPen ? App.n(l.votosPen) : '—') + '</td>' +
-          '<td data-l="Média/urna" class="r">' + (ap ? App.n(Math.round((l.votosVal + l.votosPen) / ap)) : '—') + '</td></tr>';
+          '<td data-l="Média/urna" class="r">' + (ap ? App.n(Math.round((l.votosVal + l.votosPen - l.totalInformado) / ap)) : '—') + '</td></tr>';
       }).join('');
       $('#p-tabela', raiz).innerHTML = '<thead><tr><th>Local</th><th class="r">Urnas</th><th>Progresso</th><th class="r">Confirmados</th><th class="r">Em conferência</th><th class="r">Média/urna</th></tr></thead><tbody>' + corpo + '</tbody>' +
-        '<tfoot><tr><td data-l="Total">Total</td><td data-l="Urnas" class="r">' + (t.val + t.pen) + '/' + t.total + '</td><td class="oculto-mobile"></td><td data-l="Confirmados" class="r">' + App.n(t.vv) + '</td><td data-l="Em conferência" class="r">' + App.n(t.vp) + '</td><td data-l="Média/urna" class="r">' + ((t.val + t.pen) ? App.n(Math.round((t.vv + t.vp) / (t.val + t.pen))) : '—') + '</td></tr></tfoot>';
+        '<tfoot><tr><td data-l="Total">Total</td><td data-l="Urnas" class="r">' + (t.val + t.pen) + '/' + t.total + '</td><td class="oculto-mobile"></td><td data-l="Confirmados" class="r">' + App.n(t.vv) + '</td><td data-l="Em conferência" class="r">' + App.n(t.vp) + '</td><td data-l="Média/urna" class="r">' + ((t.val + t.pen) ? App.n(Math.round(st.media)) : '—') + '</td></tr></tfoot>';
     }
 
     return { atualizar: atualizar };
