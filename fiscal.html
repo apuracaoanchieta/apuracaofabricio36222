@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <title>Fiscal — Fabricio Petri 36.222</title>
+  <meta name="description" content="Envio do Boletim de Urna pelos fiscais da campanha Fabricio Petri 36.222">
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="pg-fiscal">
+  <header class="hero">
+    <a class="voltar" href="./" aria-label="Voltar ao início"><span data-voltar></span>Início</a>
+    <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+    <p class="sub">Envio do Boletim de Urna</p>
+  </header>
+
+  <main class="wrap">
+    <div id="aviso-fila" class="aviso aviso-alerta" hidden></div>
+    <div id="aviso-conexao" class="aviso aviso-info" hidden></div>
+
+    <section id="fechado" class="card centro" hidden>
+      <div class="sucesso-icone espera" aria-hidden="true"></div>
+      <h2>Recebimento fechado</h2>
+      <p class="muted">O envio de boletins ainda não foi liberado (ou já foi encerrado) pela coordenação. Tente novamente mais tarde.</p>
+      <button class="btn btn-sec" id="btn-recarregar">Verificar novamente</button>
+    </section>
+
+    <form id="form-bu" class="card" novalidate autocomplete="on">
+      <div class="card-titulo"><h2>Dados do fiscal</h2></div>
+      <div id="ident-resumo" class="ident-resumo campo" hidden>
+        <div class="avatar" id="ident-avatar"></div>
+        <div class="info"><b id="ident-nome"></b><span id="ident-tel"></span></div>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-alterar-ident">Alterar</button>
+      </div>
+      <div id="ident-campos">
+        <div class="campo">
+          <label for="f-nome">Nome completo</label>
+          <input class="input" id="f-nome" name="name" autocomplete="name" placeholder="Seu nome" maxlength="80">
+        </div>
+        <div class="campo">
+          <label for="f-tel">Telefone (WhatsApp)</label>
+          <input class="input" id="f-tel" name="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="(28) 99999-9999" maxlength="16">
+        </div>
+      </div>
+
+      <div class="card-titulo" style="margin-top:22px"><h2>Boletim de Urna</h2></div>
+      <div class="campo">
+        <label for="f-local">Local de votação</label>
+        <select class="input" id="f-local"><option value="">Carregando locais…</option></select>
+      </div>
+      <div class="campo">
+        <label for="f-secao">Seção eleitoral</label>
+        <select class="input" id="f-secao" disabled><option value="">Escolha primeiro o local</option></select>
+        <div class="ajuda" id="ajuda-secao" hidden></div>
+      </div>
+      <div class="campo">
+        <label for="f-votos">Quantidade de votos no BU</label>
+        <div class="votos-box">
+          <div class="cand"><b id="cand-nome">Fabricio Petri</b><span id="cand-num">36.222 · Deputado Estadual</span></div>
+          <input class="votos-input" id="f-votos" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="0" aria-describedby="cand-nome" autocomplete="off">
+        </div>
+        <div class="ajuda">Digite exatamente o número impresso no boletim, na linha do 36222.</div>
+      </div>
+      <div class="campo">
+        <span class="rotulo">Foto do boletim de urna</span>
+        <div class="foto-area" id="foto-area">
+          <div id="foto-vazia">
+            <div class="icone" aria-hidden="true"></div>
+            <p>Fotografe o BU inteiro, bem iluminado e sem cortes.<br>O número da seção e os votos precisam estar legíveis.</p>
+            <div class="foto-botoes">
+              <label class="btn btn-azul" for="f-foto-camera" id="lbl-camera"><span class="ic-cam"></span>Tirar foto</label>
+              <label class="btn btn-sec" for="f-foto-galeria"><span class="ic-gal"></span>Galeria</label>
+            </div>
+          </div>
+          <div id="foto-cheia" class="foto-prev" hidden>
+            <img id="foto-preview" alt="Prévia da foto do boletim">
+            <label class="btn btn-sec btn-sm trocar" for="f-foto-camera">Trocar foto</label>
+          </div>
+          <input class="foto-input" type="file" id="f-foto-camera" accept="image/*" capture="environment">
+          <input class="foto-input" type="file" id="f-foto-galeria" accept="image/*">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primario btn-xl" id="btn-revisar" style="margin-top:20px">Revisar e enviar</button>
+    </form>
+
+    <section class="card" id="meus-envios">
+      <div class="card-titulo"><h2>Meus envios</h2><span class="muted tiny">neste aparelho</span></div>
+      <ul class="lista" id="lista-envios"></ul>
+    </section>
+  </main>
+  <p class="rodape">Dúvidas? Fale com a coordenação da apuração.</p>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/fiscal.js"></script>
+</body>
+</html>

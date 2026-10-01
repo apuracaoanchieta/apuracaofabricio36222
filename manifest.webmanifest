@@ -1,0 +1,13 @@
+{
+  "name": "Apuração — Fabricio Petri 36.222",
+  "short_name": "Apuração 36222",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#019fc6",
+  "theme_color": "#019fc6",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

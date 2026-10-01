@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <meta name="robots" content="noindex">
+  <title>Resultados — Fabricio Petri 36.222</title>
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="pg-partido">
+  <div id="tela-login" class="login-pg" hidden>
+    <header class="hero">
+      <a class="voltar" href="./" aria-label="Voltar ao início"><span data-voltar></span>Início</a>
+    <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+      <p class="sub">Acompanhamento da apuração</p>
+    </header>
+    <form class="card login-card" id="form-login" autocomplete="on">
+      <h1>Entrar</h1>
+      <p class="muted small" style="margin:0 0 18px">Acesso do candidato e do partido.</p>
+      <div class="campo"><label for="l-usuario">Usuário</label><input class="input" id="l-usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+      <div class="campo"><label for="l-senha">Senha</label>
+        <div class="senha-box"><input class="input" id="l-senha" type="password" autocomplete="current-password" required>
+          <button type="button" class="btn btn-ghost btn-sm ver" id="l-ver" aria-label="Mostrar senha"></button></div></div>
+      <div id="l-demo" class="aviso aviso-info small" hidden></div>
+      <button class="btn btn-primario btn-xl" type="submit" id="l-entrar">Entrar</button>
+      <a class="login-voltar" href="./">← Voltar às opções de acesso</a>
+    </form>
+  </div>
+
+  <div id="tela-app" hidden>
+    <header class="topbar">
+      <div class="topbar-in">
+        <a class="logo-link" href="./" title="Início"><img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri 36.222" width="480" height="410"></a>
+        <div class="titulo"><b id="t-titulo">Resultados</b><span class="oculto-mobile">Somente visualização · atualiza a cada 30 s</span></div>
+        <span class="atualizado" id="t-atualizado"><span class="pulso"></span><span>—</span></span>
+        <button class="btn btn-topo btn-sm" id="btn-sair" title="Sair" aria-label="Sair"></button>
+      </div>
+    </header>
+    <main class="wrap-l" id="sec-painel"></main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/painel.js"></script>
+  <script src="assets/js/partido.js"></script>
+</body>
+</html>

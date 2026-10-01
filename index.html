@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <title>Apuração — Fabricio Petri 36.222</title>
+  <meta name="description" content="Apuração da campanha Fabricio Petri 36.222 — fiscais, apuração e partido">
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="pg-inicio">
+  <header class="hero">
+    <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+    <p class="sub">Apuração Eleições 2026</p>
+  </header>
+
+  <main class="wrap">
+    <h1 class="inicio-titulo">Como você vai acessar?</h1>
+    <nav class="acessos" aria-label="Escolha o acesso">
+      <a class="acesso acesso-fiscal" href="fiscal.html">
+        <span class="acesso-icone" data-icone="camera"></span>
+        <span class="acesso-txt"><b>Sou fiscal</b><span>Enviar o boletim de urna da minha seção</span></span>
+        <span class="acesso-seta" data-icone="seta"></span>
+      </a>
+      <a class="acesso" href="apuracao.html">
+        <span class="acesso-icone" data-icone="check"></span>
+        <span class="acesso-txt"><b>Apuração</b><span>Conferir boletins, painel e parâmetros</span><span class="acesso-chave" id="st-apuracao">com senha</span></span>
+        <span class="acesso-seta" data-icone="seta"></span>
+      </a>
+      <a class="acesso" href="partido.html">
+        <span class="acesso-icone" data-icone="grafico"></span>
+        <span class="acesso-txt"><b>Partido / Candidato</b><span>Acompanhar os resultados</span><span class="acesso-chave" id="st-partido">com senha</span></span>
+        <span class="acesso-seta" data-icone="seta"></span>
+      </a>
+    </nav>
+  </main>
+  <p class="rodape">Fabricio Petri · Deputado Estadual · 36.222</p>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script>
+    (function () {
+      App.bannerDemo('Para usar de verdade, configure a planilha (veja o guia).');
+      var ICON = App.ICON;
+      ICON.grafico = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v2M12 10v7M17 6v11"/></svg>';
+      App.$$('[data-icone]').forEach(function (el) { el.innerHTML = ICON[el.dataset.icone] || ''; });
+      // mostra se já existe sessão aberta neste aparelho
+      [['apuracao', '#st-apuracao'], ['partido', '#st-partido']].forEach(function (x) {
+        var s = App.sessao.get(x[0]);
+        if (s) { var el = App.$(x[1]); el.textContent = 'conectado'; el.classList.add('on'); }
+      });
+      if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+    })();
+  </script>
+</body>
+</html>
