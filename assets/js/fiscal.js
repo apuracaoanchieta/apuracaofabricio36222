@@ -246,7 +246,7 @@
     var secao = params.secoes.filter(function (s) { return s.id === secaoId; })[0];
     var v = App.valorVotos(votos);
     var limite = parseInt(String(cfg.alerta_votos_max).replace(/\D/g, ''), 10) || 400;
-    var alertaAtivo = String(cfg.alerta_votos_ativo).toUpperCase() !== 'FALSE';
+    var alertaAtivo = String(cfg.alerta_votos_ativo).toUpperCase() === 'TRUE';
     var jaEnviada = recebidasSet()[secaoId];
 
     var m = App.modal(App.cabecalhoModal('Confira antes de enviar', 'Compare cada dado com o boletim impresso.') +

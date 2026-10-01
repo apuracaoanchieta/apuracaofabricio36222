@@ -36,7 +36,7 @@ var Core = (function () {
     ['municipio_principal', 'ANCHIETA', 'Município onde atuam os fiscais'],
     ['recebimento_aberto', 'TRUE', 'TRUE = fiscais podem enviar; FALSE = envio bloqueado'],
     ['foto_obrigatoria', 'TRUE', 'Exigir foto do BU no envio do fiscal'],
-    ['alerta_votos_ativo', 'TRUE', 'TRUE = avisa o fiscal quando digitar votos acima do limite; FALSE = sem aviso'],
+    ['alerta_votos_ativo', 'FALSE', 'TRUE = avisa o fiscal quando digitar votos acima do limite; FALSE = sem aviso'],
     ['alerta_votos_max', '400', 'Avisa o fiscal se digitar mais votos que isto em uma seção'],
     ['pasta_fotos_id', '', 'ID da pasta do Google Drive com as fotos (preenchido automaticamente)']
   ];
