@@ -7,8 +7,8 @@ Sistema de apuração paralela de votos para Deputado Estadual (ES).
 | Área | Arquivo | Acesso |
 |---|---|---|
 | **Fiscal** | `fiscal.html` | Link aberto (sem senha). Envia local, seção, votos e foto do BU. Funciona sem internet: guarda no celular e envia sozinho quando a conexão volta. |
-| **Apuração** | `apuracao.html` | Usuário e senha (perfil *Apuração*). Confere os BUs, corrige votos, resolve envios repetidos, lança manualmente (inclusive outros municípios), vê gráficos e altera todos os parâmetros. |
-| **Partido** | `partido.html` | Usuário e senha (perfil *Partido*). Só visualiza. Mostra separado o que está **confirmado** e o que está **em conferência**. |
+| **Apuração** | `apuracao.html` | Só senha. Confere os BUs, corrige votos, resolve envios repetidos, lança manualmente (inclusive outros municípios), vê gráficos e altera todos os parâmetros. |
+| **Partido** | `partido.html` | Só senha. Só visualiza. Mostra separado o que está **confirmado** e o que está **em conferência**. |
 
 Os painéis atualizam sozinhos a cada 30 segundos. O banco de dados é uma planilha do Google Sheets e as fotos ficam numa pasta do Google Drive.
 
@@ -18,8 +18,8 @@ Os painéis atualizam sozinhos a cada 30 segundos. O banco de dados é uma plani
 
 Do jeito que está (`API_URL: 'DEMO'` no arquivo `assets/js/config.js`), o sistema já funciona **sem planilha**, com dados fictícios salvos só no navegador. Serve para ver o visual e treinar os fiscais.
 
-- Apuração: usuário `apuracao`, senha `apuracao`
-- Partido: usuário `partido`, senha `partido`
+- Apuração: senha `apuracao`
+- Partido: senha `partido`
 
 No modo demonstração aparece uma faixa escura no topo. Ela some quando você liga a planilha (passo 2).
 
@@ -31,12 +31,8 @@ Use a **conta Google do partido**.
 
 1. Crie uma **planilha nova e vazia** no Google Sheets (ex.: "Apuração 2026 – Fabricio Petri").
 2. Menu **Extensões → Apps Script**.
-3. Apague o conteúdo que aparece no editor e cole **todo** o conteúdo do arquivo `backend/Code.gs`.
-4. No topo do código, troque as duas senhas iniciais:
-   ```js
-   var SENHA_INICIAL_APURACAO = 'sua-senha-forte-aqui';
-   var SENHA_INICIAL_PARTIDO  = 'outra-senha-forte';
-   ```
+3. Apague o conteúdo que aparece no editor e cole **todo** o conteúdo do arquivo `Code.gs` (entregue separado, fora desta pasta, porque contém as senhas: **não suba esse arquivo no GitHub**).
+4. As senhas de acesso ficam no topo do código (`SENHA_INICIAL_APURACAO` e `SENHA_INICIAL_PARTIDO`).
 5. Clique em **Salvar** (ícone de disquete).
 6. Na barra de cima, escolha a função **`instalar`** e clique em **Executar**.
    O Google vai pedir autorização: **Revisar permissões → escolha a conta → Avançado → Acessar (não seguro) → Permitir**. Isso é normal para scripts próprios.
@@ -47,7 +43,8 @@ Use a **conta Google do partido**.
    - Quem pode acessar: **Qualquer pessoa**
    - Clique em **Implantar** e **copie a URL do app da Web** (termina em `/exec`).
 
-> Os usuários iniciais são `apuracao` e `partido`, com as senhas que você definiu. Depois dá para criar outros usuários e trocar senhas em **Apuração → Parâmetros → Usuários**.
+> O login é só com senha. Depois dá para trocar as senhas em **Apuração → Parâmetros → Senhas**. Rodar `instalar` de novo volta para as senhas escritas no código.
+> A senha da Apuração também abre a área do Partido.
 
 ## Passo 2 — Ligar o site à planilha
 
@@ -63,7 +60,7 @@ window.APP_CONFIG = {
 ## Passo 3 — Publicar no GitHub Pages
 
 1. No GitHub, crie um repositório (ex.: `apuracao-fabricio`).
-2. Envie **todos os arquivos desta pasta** mantendo as pastas (`assets/`, `backend/`...). Pelo site: **Add file → Upload files** e arraste o conteúdo.
+2. Envie **todos os arquivos desta pasta** mantendo a pasta `assets/`. Pelo site: **Add file → Upload files** e arraste o conteúdo.
 3. **Settings → Pages → Branch: `main` / pasta `/ (root)` → Save**.
 4. Em 1 ou 2 minutos o **link único** fica assim:
    `https://SEU-USUARIO.github.io/apuracao-fabricio/`
@@ -93,7 +90,7 @@ Se quiser, existe também o atalho que abre direto o formulário do fiscal (`...
 
 ## Se precisar alterar o código do Apps Script depois
 
-Edite, salve e vá em **Implantar → Gerenciar implantações → lápis (editar) → Versão: Nova versão → Implantar**. Assim a URL continua a mesma e não é preciso mexer no `config.js`.
+Edite (ou cole o código novo inteiro), salve e vá em **Implantar → Gerenciar implantações → lápis (editar) → Versão: Nova versão → Implantar**. Assim a URL continua a mesma e não é preciso mexer no `config.js`.
 
 ## Problemas comuns
 
@@ -102,14 +99,14 @@ Edite, salve e vá em **Implantar → Gerenciar implantações → lápis (edita
 | Faixa "MODO DEMONSTRAÇÃO" continua aparecendo | A URL não foi colada no `config.js`, ou o GitHub ainda não atualizou (aguarde 1–2 min e recarregue). |
 | "Sem conexão com a internet" mesmo com internet | A implantação precisa estar com **Quem pode acessar: Qualquer pessoa**. Confira também se a URL termina em `/exec`. |
 | "Aba ... não encontrada" | A função `instalar` não foi executada nessa planilha. |
-| Esqueceu a senha da apuração | Na planilha, apague a linha do usuário na aba `USUARIOS`, troque `SENHA_INICIAL_APURACAO` no código e rode `instalar` de novo (ela recria só o que falta). |
+| Esqueceu a senha | Escreva a senha desejada no topo do código do Apps Script, salve e rode `instalar` de novo. |
 | Fiscal diz que não aparece o local dele | Confira se o local e a seção estão **ativos** e no **município dos fiscais** (Parâmetros). |
 
 ## Segurança
 
 - O link do fiscal é aberto, como era no Google Forms: qualquer pessoa com o link pode enviar. Por isso todo envio passa pela conferência com foto antes de virar "confirmado".
 - As senhas ficam na planilha apenas como código embaralhado (hash), nunca em texto.
-- Os acessos de Apuração e Partido duram 48 h; trocar a senha de um usuário derruba os acessos antigos dele.
+- Os acessos de Apuração e Partido duram 48 h; trocar uma senha derruba quem estava conectado com a antiga.
 - A aba `LOG` registra logins, validações e alterações de parâmetros.
 - Use a conta Google e os equipamentos da campanha/partido, não os de órgãos públicos.
 
@@ -124,5 +121,4 @@ sw.js, manifest     Funcionamento offline do fiscal
 assets/css/app.css  Visual (cores da campanha)
 assets/js/config.js URL da API  ← único arquivo que você precisa editar
 assets/js/core.js   Regras do sistema (as mesmas usadas no Apps Script)
-backend/Code.gs     Código para colar no Apps Script
 ```

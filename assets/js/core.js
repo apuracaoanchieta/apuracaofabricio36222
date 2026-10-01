@@ -322,16 +322,22 @@ var Core = (function () {
     });
   };
 
+  /* Login só com senha: procura, entre os usuários ativos do perfil da área, aquele cuja senha confere.
+   * Na área do Partido, a senha da Apuração também é aceita. */
   ACOES['login'] = function (db, req) {
-    var usuario = str(req.usuario).toLowerCase();
-    var user = find(db.read('USUARIOS'), function (u) { return str(u.usuario).toLowerCase() === usuario; });
-    if (!user || !bool(user.ativo) || hashSenha(str(user.salt), str(req.senha)) !== str(user.hash)) {
-      log(db, usuario, 'LOGIN_FALHOU', '');
-      throw erro('Usuário ou senha incorretos.');
+    var senha = str(req.senha);
+    var perfis = req.perfil === PERFIS.APURACAO ? [PERFIS.APURACAO] : [PERFIS.PARTIDO, PERFIS.APURACAO];
+    if (!senha) throw erro('Digite a senha.');
+    var users = db.read('USUARIOS').filter(function (u) { return bool(u.ativo); });
+    var user = null;
+    for (var i = 0; i < perfis.length && !user; i++) {
+      user = find(users, function (u) { return str(u.perfil) === perfis[i] && hashSenha(str(u.salt), senha) === str(u.hash); });
     }
-    if (req.perfil && str(user.perfil) !== req.perfil && !(req.perfil === PERFIS.PARTIDO && str(user.perfil) === PERFIS.APURACAO)) {
-      throw erro('Este usuário não tem acesso a esta área.');
+    if (!user) {
+      log(db, '', 'LOGIN_FALHOU', req.perfil || '');
+      throw erro('Senha incorreta.');
     }
+    var usuario = str(user.usuario).toLowerCase();
     log(db, usuario, 'LOGIN', '');
     return { token: gerarToken(db, user), usuario: usuario, perfil: str(user.perfil) };
   };
@@ -668,9 +674,10 @@ var Core = (function () {
     }
     var users = db.read('USUARIOS');
     [['apuracao', PERFIS.APURACAO, senhas.apuracao], ['partido', PERFIS.PARTIDO, senhas.partido]].forEach(function (x) {
-      if (find(users, function (u) { return str(u.usuario).toLowerCase() === x[0]; })) return;
+      var ex = find(users, function (u) { return str(u.usuario).toLowerCase() === x[0]; });
       var salt = sha256(db.uuid()).substr(0, 16);
-      db.append('USUARIOS', { usuario: x[0], perfil: x[1], salt: salt, hash: hashSenha(salt, x[2]), ativo: 'TRUE', criado_em: db.stamp() });
+      var obj = { usuario: x[0], perfil: x[1], salt: salt, hash: hashSenha(salt, x[2]), ativo: 'TRUE', criado_em: ex ? str(ex.criado_em) : db.stamp() };
+      if (ex) db.update('USUARIOS', ex._row, obj); else db.append('USUARIOS', obj);
     });
     segredo(db);
   }

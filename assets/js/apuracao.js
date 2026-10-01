@@ -11,7 +11,7 @@
   var timer = null, carregandoDados = false;
   var ROT_STATUS = { PENDENTE: 'Em conferência', VALIDADO: 'Confirmado', REJEITADO: 'Rejeitado', DESCARTADO: 'Substituído' };
 
-  App.bannerDemo('Login: <b>apuracao</b> / senha <b>apuracao</b>.');
+  App.bannerDemo('Senha: <b>apuracao</b>.');
   $('#btn-atualizar').innerHTML = ICON.atualizar;
   $('#btn-sair').innerHTML = ICON.sair;
   $('#l-ver').innerHTML = ICON.olho;
@@ -19,14 +19,14 @@
   /* ================= LOGIN ================= */
   function telaLogin() {
     $('#tela-app').hidden = true; $('#tela-login').hidden = false;
-    if (App.DEMO) { var d = $('#l-demo'); d.hidden = false; d.innerHTML = ICON.info + '<div>Demonstração: usuário <b>apuracao</b>, senha <b>apuracao</b>.</div>'; }
-    setTimeout(function () { $('#l-usuario').focus(); }, 50);
+    if (App.DEMO) { var d = $('#l-demo'); d.hidden = false; d.innerHTML = ICON.info + '<div>Demonstração: senha <strong>apuracao</strong></div>'; }
+    setTimeout(function () { $('#l-senha').focus({ preventScroll: true }); }, 50);
   }
   $('#l-ver').addEventListener('click', function () { var i = $('#l-senha'); i.type = i.type === 'password' ? 'text' : 'password'; });
   $('#form-login').addEventListener('submit', function (e) {
     e.preventDefault();
     var b = $('#l-entrar'); App.carregando(b, true, 'Entrando…');
-    App.api('login', { usuario: $('#l-usuario').value.trim(), senha: $('#l-senha').value, perfil: 'APURACAO' }).then(function (r) {
+    App.api('login', { senha: $('#l-senha').value, perfil: 'APURACAO' }).then(function (r) {
       sess = { token: r.token, usuario: r.usuario, perfil: r.perfil };
       App.sessao.set(AREA, sess);
       $('#l-senha').value = '';
@@ -49,7 +49,7 @@
   /* ================= APP ================= */
   function iniciarApp() {
     $('#tela-login').hidden = true; $('#tela-app').hidden = false; window.scrollTo(0, 0);
-    $('#t-usuario').textContent = 'Conectado como ' + sess.usuario;
+    $('#t-usuario').textContent = 'Acesso da apuração';
     if (!painel) {
       painel = Painel.criar($('#sec-painel'), {
         modo: 'apuracao',
@@ -393,7 +393,7 @@
     if (!dados) return;
     var el = $('#sec-parametros');
     el.innerHTML = '<div class="sub-abas" role="tablist">' +
-      [['geral', 'Geral'], ['locais', 'Locais e seções'], ['usuarios', 'Usuários']].map(function (s) {
+      [['geral', 'Geral'], ['locais', 'Locais e seções'], ['usuarios', 'Senhas']].map(function (s) {
         return '<button class="sub-aba' + (subAba === s[0] ? ' ativa' : '') + '" data-sub="' + s[0] + '">' + s[1] + '</button>';
       }).join('') + '</div><div id="par-conteudo"></div>';
     $$('.sub-aba', el).forEach(function (b) { b.onclick = function () { subAba = b.dataset.sub; renderParametros(); }; });
@@ -569,49 +569,33 @@
     };
   }
 
-  /* --- Usuários --- */
+  /* --- Senhas de acesso --- */
   function parUsuarios() {
-    $('#par-conteudo').innerHTML = '<div class="card" style="max-width:820px"><div class="card-titulo"><h3>Usuários com acesso</h3><button class="btn btn-azul btn-sm" id="pu-novo">' + ICON.mais + 'Novo usuário</button></div>' +
-      '<p class="muted small" style="margin-top:-6px"><b>Apuração</b>: confere, lança e altera parâmetros. <b>Partido</b>: só visualiza os resultados.</p>' +
-      '<div class="tabela-wrap"><table class="tabela responsiva"><thead><tr><th>Usuário</th><th>Perfil</th><th>Situação</th><th></th></tr></thead><tbody>' +
-      dados.usuarios.map(function (u) {
-        return '<tr><td data-l="Usuário"><b>' + h(u.usuario) + '</b>' + (u.usuario === sess.usuario ? ' <span class="tiny muted">(você)</span>' : '') + '</td>' +
-          '<td data-l="Perfil">' + (u.perfil === 'APURACAO' ? 'Apuração' : 'Partido') + '</td>' +
-          '<td data-l="Situação">' + (u.ativo ? '<span class="selo selo-ENVIADO">ativo</span>' : '<span class="selo selo-DESCARTADO">bloqueado</span>') + '</td>' +
-          '<td data-l=""><button class="btn btn-sec btn-sm" data-edusr="' + h(u.usuario) + '">' + ICON.lapis + 'Editar / senha</button></td></tr>';
-      }).join('') + '</tbody></table></div></div>';
-    $('#pu-novo').onclick = function () { modalUsuario(null); };
-    $$('[data-edusr]').forEach(function (b) { b.onclick = function () { modalUsuario(dados.usuarios.filter(function (u) { return u.usuario === b.dataset.edusr; })[0]); }; });
-  }
-  function modalUsuario(u) {
-    var m = App.modal(App.cabecalhoModal(u ? 'Editar ' + u.usuario : 'Novo usuário') +
-      '<form id="mu-form" autocomplete="off"><div class="campo"><label for="mu-usr">Usuário</label><input class="input" id="mu-usr" value="' + (u ? h(u.usuario) : '') + '"' + (u ? ' disabled' : ' autofocus') + ' autocapitalize="none" spellcheck="false"><div class="ajuda">Letras minúsculas, sem espaço e sem acento (ex.: maria.silva).</div></div>' +
-      '<div class="campo"><label for="mu-perfil">Perfil</label><select class="input" id="mu-perfil"><option value="APURACAO">Apuração (acesso completo)</option><option value="PARTIDO">Partido (somente visualização)</option></select></div>' +
-      '<div class="campo"><label for="mu-senha">' + (u ? 'Nova senha <span class="muted">(deixe em branco para manter)</span>' : 'Senha') + '</label><input class="input" id="mu-senha" type="text" autocomplete="new-password"' + (u ? '' : ' required') + ' minlength="6"><div class="ajuda">Mínimo de 6 caracteres.</div></div>' +
-      '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px"><div><b>Acesso liberado</b><span>Desligue para bloquear sem excluir.</span></div><label class="switch"><input type="checkbox" id="mu-ativo"' + (!u || u.ativo ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
-      '<div class="acoes">' + (u && u.usuario !== sess.usuario ? '<button type="button" class="btn btn-perigo-sec" id="mu-excluir">' + ICON.lixo + 'Excluir</button>' : '') +
-      '<button type="button" class="btn btn-sec" data-fechar>Cancelar</button><button class="btn btn-azul" type="submit" id="mu-salvar">Salvar</button></div></form>');
-    if (u) $('#mu-perfil', m.el).value = u.perfil;
-    $('#mu-form', m.el).onsubmit = function (e) {
-      e.preventDefault();
-      var usr = u ? u.usuario : $('#mu-usr', m.el).value.trim().toLowerCase(), senha = $('#mu-senha', m.el).value;
-      var b = $('#mu-salvar', m.el); App.carregando(b, true);
-      chamar('apuracao.salvarUsuario', { usuario: usr, perfil: $('#mu-perfil', m.el).value, senha: senha, ativo: $('#mu-ativo', m.el).checked }).then(function () {
-        // trocou a própria senha: entra de novo com a nova
-        if (usr === sess.usuario && senha) {
-          return App.api('login', { usuario: usr, senha: senha }).then(function (r) { sess.token = r.token; App.sessao.set(AREA, sess); });
-        }
-      }).then(function () {
-        App.toast('Usuário salvo.', 'ok'); m.fechar(); recarregarParametros();
-      }).catch(function (e2) { App.toast(e2.message, 'erro'); App.carregando(b, false); });
+    var cartao = function (usuario, titulo, desc) {
+      return '<form class="card" data-senha="' + usuario + '" autocomplete="off"><div class="card-titulo"><h3>' + titulo + '</h3></div>' +
+        '<p class="muted small" style="margin-top:-6px">' + desc + '</p>' +
+        '<div class="campo"><label for="ns-' + usuario + '">Nova senha</label><input class="input" id="ns-' + usuario + '" type="text" autocomplete="new-password" minlength="6" placeholder="mínimo 6 caracteres"></div>' +
+        '<div class="campo"><label for="nc-' + usuario + '">Repita a nova senha</label><input class="input" id="nc-' + usuario + '" type="text" autocomplete="new-password"></div>' +
+        '<button class="btn btn-azul" type="submit">Trocar senha</button></form>';
     };
-    var ex = $('#mu-excluir', m.el);
-    if (ex) ex.onclick = function () {
-      App.confirmar('Excluir usuário?', 'O usuário <b>' + h(u.usuario) + '</b> perderá o acesso.', 'Excluir', true).then(function (ok) {
-        if (!ok) return;
-        chamar('apuracao.excluirUsuario', { usuario: u.usuario }).then(function () { App.toast('Usuário excluído.'); m.fechar(); recarregarParametros(); }).catch(function (e2) { App.toast(e2.message, 'erro'); });
-      });
-    };
+    $('#par-conteudo').innerHTML = '<div class="grade-painel grade-senhas">' +
+      cartao('apuracao', 'Senha da Apuração', 'Dá acesso completo: conferência, lançamentos e parâmetros.') +
+      cartao('partido', 'Senha do Partido / Candidato', 'Só visualiza os resultados.') + '</div>' +
+      '<p class="muted small" style="margin-top:14px">Ao trocar uma senha, quem estiver conectado com a senha antiga precisa entrar de novo.</p>';
+    $$('[data-senha]').forEach(function (f) {
+      f.onsubmit = function (e) {
+        e.preventDefault();
+        var usr = f.dataset.senha, nova = $('#ns-' + usr).value, conf = $('#nc-' + usr).value;
+        if (nova.length < 6) return App.toast('A senha deve ter pelo menos 6 caracteres.', 'erro');
+        if (nova !== conf) return App.toast('As duas senhas não são iguais.', 'erro');
+        var b = $('button[type=submit]', f); App.carregando(b, true, 'Salvando…');
+        chamar('apuracao.salvarUsuario', { usuario: usr, perfil: usr === 'apuracao' ? 'APURACAO' : 'PARTIDO', senha: nova, ativo: true }).then(function () {
+          if (usr === 'apuracao') return App.api('login', { senha: nova, perfil: 'APURACAO' }).then(function (r) { sess.token = r.token; sess.usuario = r.usuario; App.sessao.set(AREA, sess); });
+        }).then(function () {
+          App.toast('Senha alterada.', 'ok'); recarregarParametros();
+        }).catch(function (e2) { App.toast(e2.message, 'erro'); App.carregando(b, false); });
+      };
+    });
   }
 
   /* ================= INÍCIO ================= */

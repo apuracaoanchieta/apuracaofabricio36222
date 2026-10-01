@@ -271,7 +271,7 @@ textarea.input { min-height: 110px; resize: vertical; }
 /* ---------- Login ---------- */
 .login-pg { min-height: 100vh; display: flex; flex-direction: column; }
 .login-pg .hero { padding-bottom: 90px; }
-.login-card { max-width: 420px; margin: -64px auto 30px; width: calc(100% - 28px); }
+.login-card { max-width: 420px; margin: -64px auto 30px; width: calc(100% - 28px); position: relative; z-index: 1; }
 .login-card h1 { font-size: 21px; margin: 0 0 2px; font-weight: 800; }
 .senha-box { position: relative; }
 .senha-box .ver { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
@@ -341,6 +341,7 @@ textarea.input { min-height: 110px; resize: vertical; }
 
 .grade-painel { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; }
 .grade-painel > .card { margin-bottom: 0; }
+.grade-senhas { grid-template-columns: 1fr 1fr; max-width: 900px; }
 @media (max-width: 1000px) { .grade-painel { grid-template-columns: 1fr; } }
 .grade-painel + .grade-painel, .grade-painel + .card, .card + .grade-painel { margin-top: 16px; }
 .grafico { position: relative; width: 100%; min-width: 0; }

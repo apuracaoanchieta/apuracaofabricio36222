@@ -5,20 +5,20 @@
   var AREA = 'partido';
   var sess = App.sessao.get(AREA), painel = null, timer = null, ocupado = false;
 
-  App.bannerDemo('Login: <b>partido</b> / senha <b>partido</b>.');
+  App.bannerDemo('Senha: <b>partido</b>.');
   $('#btn-sair').innerHTML = ICON.sair;
   $('#l-ver').innerHTML = ICON.olho;
 
   function telaLogin() {
     $('#tela-app').hidden = true; $('#tela-login').hidden = false;
-    if (App.DEMO) { var d = $('#l-demo'); d.hidden = false; d.innerHTML = ICON.info + '<div>Demonstração: usuário <b>partido</b>, senha <b>partido</b>.</div>'; }
-    setTimeout(function () { $('#l-usuario').focus(); }, 50);
+    if (App.DEMO) { var d = $('#l-demo'); d.hidden = false; d.innerHTML = ICON.info + '<div>Demonstração: senha <strong>partido</strong></div>'; }
+    setTimeout(function () { $('#l-senha').focus({ preventScroll: true }); }, 50);
   }
   $('#l-ver').addEventListener('click', function () { var i = $('#l-senha'); i.type = i.type === 'password' ? 'text' : 'password'; });
   $('#form-login').addEventListener('submit', function (e) {
     e.preventDefault();
     var b = $('#l-entrar'); App.carregando(b, true, 'Entrando…');
-    App.api('login', { usuario: $('#l-usuario').value.trim(), senha: $('#l-senha').value, perfil: 'PARTIDO' }).then(function (r) {
+    App.api('login', { senha: $('#l-senha').value, perfil: 'PARTIDO' }).then(function (r) {
       sess = { token: r.token, usuario: r.usuario }; App.sessao.set(AREA, sess); $('#l-senha').value = ''; iniciar();
     }).catch(function (err) { App.toast(err.message, 'erro'); }).then(function () { App.carregando(b, false); });
   });
