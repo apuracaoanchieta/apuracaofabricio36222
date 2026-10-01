@@ -6,7 +6,8 @@
   var sess = App.sessao.get(AREA);
   var dados = null, painel = null, aba = 'painel', subAba = 'geral';
   var dupMap = {}, urnasMap = {}, fotosCache = {};
-  var filtros = { busca: '', status: 'TODOS', local: '', mun: '' };
+  var filtros = { busca: '', status: 'TODOS', local: '', mun: '', origem: '', ordem: 'recentes' };
+  var cfFiltro = { busca: '', local: '', ordem: 'antigos' };
   var paramMun = null, buscaLocal = '';
   var timer = null, carregandoDados = false;
   var ROT_STATUS = { PENDENTE: 'Em conferência', VALIDADO: 'Confirmado', REJEITADO: 'Rejeitado', DESCARTADO: 'Substituído' };
@@ -35,7 +36,7 @@
   });
   $('#btn-sair').addEventListener('click', function () {
     App.confirmar('Sair do sistema?', 'Você precisará entrar novamente com usuário e senha.', 'Sair').then(function (ok) {
-      if (!ok) return; App.sessao.sair(AREA); sess = null; clearInterval(timer); telaLogin();
+      if (!ok) return; App.sessao.sair(AREA); sess = null; clearInterval(timer); location.href = './';
     });
   });
   function sessaoExpirou(err) {
@@ -123,6 +124,16 @@
     var loc = dados.locais.filter(function (x) { return x.id === l.local_id; })[0];
     return loc ? loc.nome : l.local;
   }
+  function opcoesLocaisLanc(lista, valor) {
+    var vistos = {}, ops = [];
+    lista.forEach(function (l) { if (!vistos[l.local_id]) { vistos[l.local_id] = true; ops.push({ id: l.local_id, nome: nomeLocal(l), mun: l.municipio }); } });
+    var varios = ops.some(function (o) { return Core.norm(o.mun) !== Core.norm(dados.config.municipio_principal); });
+    ops.sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+    return '<option value="">Todos os locais</option>' + ops.map(function (o) {
+      return '<option value="' + h(o.id) + '"' + (o.id === valor ? ' selected' : '') + '>' + h(o.nome) + (varios ? ' — ' + h(o.mun) : '') + '</option>';
+    }).join('');
+  }
+  function textoBusca(l) { return Core.norm([nomeLocal(l), 'secao ' + l.secao, l.secao, l.nome, l.telefone, l.municipio].join(' ')); }
   function corrigido(l) { return typeof l.votos_informados === 'number' && typeof l.votos === 'number' && l.votos !== l.votos_informados; }
   function selo(st) { return '<span class="selo selo-' + st + '">' + ROT_STATUS[st] + '</span>'; }
 
@@ -144,10 +155,41 @@
   }
 
   function renderConferencia() {
-    var el = $('#sec-conferencia');
-    var pend = dados.lancamentos.filter(function (l) { return l.status === 'PENDENTE' && !dupMap[l.secao_id]; })
-      .sort(function (a, b) { return a.recebido_em < b.recebido_em ? -1 : 1; });
-    var grupos = Object.keys(dupMap).map(function (k) { return dupMap[k]; });
+    var raiz = $('#sec-conferencia');
+    if (!$('#cf-busca', raiz)) {
+      raiz.innerHTML = '<div class="filtros card">' +
+        '<div class="filtro filtro-largo"><label for="cf-busca">Buscar</label><input class="input" id="cf-busca" type="search" placeholder="Local, nº da seção ou fiscal"></div>' +
+        '<div class="filtro filtro-largo"><label for="cf-local">Local de votação</label><select class="input" id="cf-local"></select></div>' +
+        '<div class="filtro"><label for="cf-ordem">Ordenar</label><select class="input" id="cf-ordem">' +
+        '<option value="antigos">Mais antigos primeiro</option><option value="recentes">Mais recentes primeiro</option>' +
+        '<option value="maior">Mais votos primeiro</option><option value="menor">Menos votos primeiro</option><option value="secao">Nº da seção</option></select></div>' +
+        '<button class="btn btn-ghost btn-sm filtro-limpar" id="cf-limpar" type="button" hidden>Limpar filtros</button></div><div id="cf-res"></div>';
+      $('#cf-busca', raiz).addEventListener('input', function () { cfFiltro.busca = this.value; renderConferencia(); });
+      $('#cf-local', raiz).addEventListener('change', function () { cfFiltro.local = this.value; renderConferencia(); });
+      $('#cf-ordem', raiz).addEventListener('change', function () { cfFiltro.ordem = this.value; renderConferencia(); });
+      $('#cf-limpar', raiz).addEventListener('click', function () { cfFiltro.busca = ''; cfFiltro.local = ''; $('#cf-busca', raiz).value = ''; renderConferencia(); });
+    }
+    var abertos = dados.lancamentos.filter(function (l) { return l.status === 'PENDENTE' || (l.status === 'VALIDADO' && dupMap[l.secao_id]); });
+    $('#cf-local', raiz).innerHTML = opcoesLocaisLanc(abertos, cfFiltro.local);
+    if (cfFiltro.local && $('#cf-local', raiz).value !== cfFiltro.local) cfFiltro.local = '';
+    $('#cf-ordem', raiz).value = cfFiltro.ordem;
+    var q = Core.norm(cfFiltro.busca);
+    var filtrando = !!(q || cfFiltro.local);
+    $('#cf-limpar', raiz).hidden = !filtrando;
+    var passa = function (l) { return (!cfFiltro.local || l.local_id === cfFiltro.local) && (!q || textoBusca(l).indexOf(q) >= 0); };
+    var ordens = {
+      antigos: function (a, b) { return a.recebido_em < b.recebido_em ? -1 : 1; },
+      recentes: function (a, b) { return a.recebido_em < b.recebido_em ? 1 : -1; },
+      maior: function (a, b) { return (b.votos || 0) - (a.votos || 0); },
+      menor: function (a, b) { return (a.votos || 0) - (b.votos || 0); },
+      secao: function (a, b) { return Number(a.secao) - Number(b.secao); }
+    };
+    var rotOrdem = { antigos: 'mais antigos primeiro', recentes: 'mais recentes primeiro', maior: 'mais votos primeiro', menor: 'menos votos primeiro', secao: 'por nº da seção' };
+    var totalPend = dados.lancamentos.filter(function (l) { return l.status === 'PENDENTE' && !dupMap[l.secao_id]; }).length;
+    var pend = dados.lancamentos.filter(function (l) { return l.status === 'PENDENTE' && !dupMap[l.secao_id] && passa(l); })
+      .sort(ordens[cfFiltro.ordem] || ordens.antigos);
+    var grupos = Object.keys(dupMap).map(function (k) { return dupMap[k]; }).filter(function (g) { return g.some(passa); });
+    var el = $('#cf-res', raiz);
     var html = '';
     if (grupos.length) {
       html += '<div class="card-titulo"><h2>' + grupos.length + (grupos.length > 1 ? ' seções com envios repetidos' : ' seção com envio repetido') + '</h2></div>';
@@ -158,8 +200,11 @@
           '<div class="conf-lista">' + g.map(function (l) { return cartaoConf(l, true); }).join('') + '</div></div>';
       }).join('');
     }
-    html += '<div class="card-titulo" style="margin-top:' + (grupos.length ? '24px' : '0') + '"><h2>Aguardando conferência</h2><span class="muted small">' + pend.length + ' envio' + (pend.length === 1 ? '' : 's') + ' · mais antigos primeiro</span></div>';
-    if (!pend.length) {
+    html += '<div class="card-titulo" style="margin-top:' + (grupos.length ? '24px' : '0') + '"><h2>Aguardando conferência</h2><span class="muted small">' +
+      (filtrando ? pend.length + ' de ' + totalPend : pend.length) + ' envio' + ((filtrando ? totalPend : pend.length) === 1 ? '' : 's') + ' · ' + rotOrdem[cfFiltro.ordem] + '</span></div>';
+    if (!pend.length && filtrando) {
+      html += '<div class="card vazio">Nenhum envio aguardando conferência com esse filtro.</div>';
+    } else if (!pend.length) {
       html += '<div class="card centro" style="padding:36px 20px"><div class="sucesso-icone">' + ICON.check + '</div><h2>Tudo conferido</h2><p class="muted" style="margin:6px 0 0">Novos envios dos fiscais aparecem aqui automaticamente (a cada 30 segundos).</p></div>';
     } else {
       html += '<div class="conf-lista">' + pend.map(function (l) { return cartaoConf(l, false); }).join('') + '</div>';
@@ -190,8 +235,10 @@
   }
 
   function proximoPendente(atualId) {
-    var pend = dados.lancamentos.filter(function (l) { return l.status === 'PENDENTE' && l.id !== atualId; })
-      .sort(function (a, b) { return a.recebido_em < b.recebido_em ? -1 : 1; });
+    var q = Core.norm(cfFiltro.busca);
+    var pend = dados.lancamentos.filter(function (l) {
+      return l.status === 'PENDENTE' && l.id !== atualId && (!cfFiltro.local || l.local_id === cfFiltro.local) && (!q || textoBusca(l).indexOf(q) >= 0);
+    }).sort(function (a, b) { return a.recebido_em < b.recebido_em ? -1 : 1; });
     return pend[0] || null;
   }
 
@@ -276,20 +323,34 @@
   function renderLancamentos() {
     var el = $('#sec-lancamentos');
     if (!$('#lf-busca', el)) {
-      el.innerHTML = '<div class="barra-filtro">' +
-        '<input class="input" id="lf-busca" type="search" placeholder="Buscar local, seção ou fiscal" style="flex:1;min-width:200px">' +
-        '<select class="input" id="lf-status"><option value="TODOS">Todos os status</option><option value="PENDENTE">Em conferência</option><option value="VALIDADO">Confirmados</option><option value="REJEITADO">Rejeitados</option><option value="DESCARTADO">Substituídos</option></select>' +
-        '<select class="input" id="lf-mun"></select></div>' +
+      el.innerHTML = '<div class="filtros card">' +
+        '<div class="filtro filtro-largo"><label for="lf-busca">Buscar</label><input class="input" id="lf-busca" type="search" placeholder="Local, nº da seção, fiscal ou telefone"></div>' +
+        '<div class="filtro"><label for="lf-status">Status</label><select class="input" id="lf-status"><option value="TODOS">Todos</option><option value="PENDENTE">Em conferência</option><option value="VALIDADO">Confirmados</option><option value="REJEITADO">Rejeitados</option><option value="DESCARTADO">Substituídos</option></select></div>' +
+        '<div class="filtro"><label for="lf-mun">Município</label><select class="input" id="lf-mun"></select></div>' +
+        '<div class="filtro filtro-largo"><label for="lf-local">Local de votação</label><select class="input" id="lf-local"></select></div>' +
+        '<div class="filtro"><label for="lf-origem">Origem</label><select class="input" id="lf-origem"><option value="">Todas</option><option value="FISCAL">Fiscais</option><option value="APURACAO">Lançados pela apuração</option></select></div>' +
+        '<div class="filtro"><label for="lf-ordem">Ordenar</label><select class="input" id="lf-ordem"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option><option value="maior">Mais votos</option><option value="menor">Menos votos</option><option value="secao">Nº da seção</option></select></div>' +
+        '<button class="btn btn-ghost btn-sm filtro-limpar" id="lf-limpar" type="button" hidden>Limpar filtros</button></div>' +
         '<div class="card" style="padding:12px 16px"><div class="muted small" id="lf-total" style="margin:4px 0 8px"></div><div class="tabela-wrap"><table class="tabela responsiva" id="lf-tabela"></table></div></div>';
       $('#lf-busca', el).addEventListener('input', function () { filtros.busca = this.value; desenharTabela(); });
       $('#lf-status', el).addEventListener('change', function () { filtros.status = this.value; desenharTabela(); });
-      $('#lf-mun', el).addEventListener('change', function () { filtros.mun = this.value; desenharTabela(); });
+      $('#lf-mun', el).addEventListener('change', function () { filtros.mun = this.value; filtros.local = ''; renderLancamentos(); });
+      $('#lf-local', el).addEventListener('change', function () { filtros.local = this.value; desenharTabela(); });
+      $('#lf-origem', el).addEventListener('change', function () { filtros.origem = this.value; desenharTabela(); });
+      $('#lf-ordem', el).addEventListener('change', function () { filtros.ordem = this.value; desenharTabela(); });
+      $('#lf-limpar', el).addEventListener('click', function () {
+        filtros.busca = ''; filtros.status = 'TODOS'; filtros.mun = ''; filtros.local = ''; filtros.origem = '';
+        $('#lf-busca', el).value = ''; $('#lf-origem', el).value = ''; renderLancamentos();
+      });
     }
     var muns = {}; dados.lancamentos.forEach(function (l) { if (l.municipio) muns[l.municipio] = true; });
     var selM = $('#lf-mun', el);
     selM.innerHTML = '<option value="">Todos os municípios</option>' + Object.keys(muns).sort().map(function (m) { return '<option>' + h(m) + '</option>'; }).join('');
-    selM.value = filtros.mun; selM.hidden = Object.keys(muns).length < 2;
+    selM.value = filtros.mun; selM.closest('.filtro').hidden = Object.keys(muns).length < 2;
+    $('#lf-local', el).innerHTML = opcoesLocaisLanc(dados.lancamentos.filter(function (l) { return !filtros.mun || l.municipio === filtros.mun; }), filtros.local);
+    if (filtros.local && $('#lf-local', el).value !== filtros.local) filtros.local = '';
     $('#lf-status', el).value = filtros.status;
+    $('#lf-ordem', el).value = filtros.ordem;
     desenharTabela();
   }
   function desenharTabela() {
@@ -297,9 +358,18 @@
     var lista = dados.lancamentos.filter(function (l) {
       if (filtros.status !== 'TODOS' && l.status !== filtros.status) return false;
       if (filtros.mun && l.municipio !== filtros.mun) return false;
-      if (q && Core.norm([nomeLocal(l), 'secao ' + l.secao, l.secao, l.nome, l.telefone].join(' ')).indexOf(q) < 0) return false;
+      if (filtros.local && l.local_id !== filtros.local) return false;
+      if (filtros.origem && l.origem !== filtros.origem) return false;
+      if (q && textoBusca(l).indexOf(q) < 0) return false;
       return true;
-    }).sort(function (a, b) { return a.recebido_em < b.recebido_em ? 1 : -1; });
+    }).sort({
+      recentes: function (a, b) { return a.recebido_em < b.recebido_em ? 1 : -1; },
+      antigos: function (a, b) { return a.recebido_em < b.recebido_em ? -1 : 1; },
+      maior: function (a, b) { return (b.votos || 0) - (a.votos || 0); },
+      menor: function (a, b) { return (a.votos || 0) - (b.votos || 0); },
+      secao: function (a, b) { return Number(a.secao) - Number(b.secao); }
+    }[filtros.ordem]);
+    $('#lf-limpar').hidden = !(filtros.busca || filtros.status !== 'TODOS' || filtros.mun || filtros.local || filtros.origem);
     var soma = 0; lista.forEach(function (l) { if (typeof l.votos === 'number') soma += l.votos; });
     $('#lf-total').textContent = lista.length + ' envio' + (lista.length === 1 ? '' : 's') + (filtros.status !== 'TODOS' ? ' · ' + App.n(soma) + ' votos' : '');
     $('#lf-tabela').innerHTML = '<thead><tr><th>Hora</th><th>Local</th><th class="r">Seção</th><th class="r">Votos</th><th>Fiscal</th><th>Status</th><th></th></tr></thead><tbody>' +

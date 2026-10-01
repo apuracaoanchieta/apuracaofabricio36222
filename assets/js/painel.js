@@ -33,13 +33,14 @@ var Painel = (function () {
     }
   };
 
-  function calcular(dados, municipio) {
+  function calcular(dados, municipio, localId) {
     var cfg = dados.config || {};
     var principal = Core.norm(cfg.municipio_principal || 'ANCHIETA');
     var todos = municipio === '__TODOS__';
     var alvo = todos ? null : Core.norm(municipio || principal);
     var locais = {}; dados.locais.forEach(function (l) { locais[l.id] = l; });
     var noFiltro = function (mun) { return todos || Core.norm(mun) === alvo; };
+    var noLocal = function (id) { return !localId || id === localId; };
 
     var porLocal = {};
     function linhaLocal(id, nome, mun) {
@@ -52,7 +53,7 @@ var Painel = (function () {
     var totalUrnas = 0;
     dados.secoes.forEach(function (s) {
       var l = locais[s.local_id];
-      if (!l || !noFiltro(l.municipio)) return;
+      if (!l || !noFiltro(l.municipio) || !noLocal(l.id)) return;
       var u = urnaPorSecao[s.id];
       if (!s.ativo && !u) return;
       var r = linhaLocal(l.id, l.nome, l.municipio);
@@ -61,7 +62,7 @@ var Painel = (function () {
     });
     var st = { votosVal: 0, votosPen: 0, urnasVal: 0, urnasPen: 0, totalUrnas: totalUrnas, eventos: [] };
     dados.urnas.forEach(function (u) {
-      if (!noFiltro(u.municipio)) return;
+      if (!noFiltro(u.municipio) || !noLocal(u.local_id)) return;
       var r = porLocal[u.local_id] || linhaLocal(u.local_id, u.local, u.municipio);
       if (!r.secoes.some(function (s) { return s.id === u.secao_id; })) r.secoes.push({ id: u.secao_id, numero: u.secao, ativo: true, urna: u });
       if (u.status === 'VALIDADO') { r.val++; r.votosVal += u.votos; st.urnasVal++; st.votosVal += u.votos; }
@@ -96,12 +97,16 @@ var Painel = (function () {
     opcoes = opcoes || {};
     var partido = opcoes.modo === 'partido';
     var graficos = {};
-    var municipio = null, ultimo = null;
+    var municipio = null, ultimo = null, localSel = '', situacao = 'TODAS';
 
     raiz.innerHTML =
-      '<div class="barra-filtro"><label class="sr-only" for="p-mun">Município</label>' +
-      '<select class="input" id="p-mun"></select><span class="esp"></span>' +
-      '<div class="legenda" style="margin:0"><span><i class="l-val"></i>Confirmados</span><span><i class="l-pen"></i>Em conferência</span><span><i class="l-sem"></i>Sem envio</span></div></div>' +
+      '<div class="filtros card">' +
+      '<div class="filtro"><label for="p-mun">Município</label><select class="input" id="p-mun"></select></div>' +
+      '<div class="filtro filtro-largo"><label for="p-local">Local de votação</label><select class="input" id="p-local"></select></div>' +
+      '<div class="filtro"><label for="p-sit">Mostrar urnas</label><select class="input" id="p-sit">' +
+      '<option value="TODAS">Todas</option><option value="VALIDADO">Só confirmadas</option><option value="PENDENTE">Só em conferência</option><option value="SEM">Só sem envio</option></select></div>' +
+      '<button class="btn btn-ghost btn-sm filtro-limpar" id="p-limpar" type="button" hidden>Limpar filtros</button>' +
+      '<div class="legenda filtro-legenda"><span><i class="l-val"></i>Confirmados</span><span><i class="l-pen"></i>Em conferência</span><span><i class="l-sem"></i>Sem envio</span></div></div>' +
       '<div id="p-outros"></div>' +
       '<div class="kpis" id="p-kpis"></div>' +
       (partido ? '<div class="explica">' +
@@ -115,7 +120,32 @@ var Painel = (function () {
       '<section class="card"><div class="card-titulo"><h3>Mapa das urnas</h3><span class="muted tiny">número da seção e votos</span></div><div class="mapa" id="p-mapa"></div></section>' +
       '<section class="card"><div class="card-titulo"><h3>Resumo por local</h3></div><div class="tabela-wrap"><table class="tabela responsiva" id="p-tabela"></table></div></section>';
 
-    $('#p-mun', raiz).addEventListener('change', function () { municipio = this.value; if (ultimo) atualizar(ultimo); });
+    $('#p-mun', raiz).addEventListener('change', function () { municipio = this.value; localSel = ''; if (ultimo) atualizar(ultimo); });
+    $('#p-local', raiz).addEventListener('change', function () { localSel = this.value; if (ultimo) atualizar(ultimo); });
+    $('#p-sit', raiz).addEventListener('change', function () { situacao = this.value; if (ultimo) atualizar(ultimo); });
+    $('#p-limpar', raiz).addEventListener('click', function () { localSel = ''; situacao = 'TODAS'; $('#p-sit', raiz).value = 'TODAS'; if (ultimo) atualizar(ultimo); });
+
+    function opcoesLocal(dados) {
+      var todos = municipio === '__TODOS__', alvo = Core.norm(municipio);
+      var comSecao = {};
+      dados.secoes.forEach(function (s) { if (s.ativo) comSecao[s.local_id] = true; });
+      dados.urnas.forEach(function (u) { comSecao[u.local_id] = true; });
+      var ls = dados.locais.filter(function (l) { return comSecao[l.id] && (todos || Core.norm(l.municipio) === alvo); })
+        .sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+      var sel = $('#p-local', raiz);
+      var html = '<option value="">Todos os locais</option>' + ls.map(function (l) {
+        return '<option value="' + h(l.id) + '">' + h(l.nome) + (todos ? ' — ' + h(l.municipio) : '') + '</option>';
+      }).join('');
+      if (sel.innerHTML !== html) sel.innerHTML = html;
+      if (localSel && !ls.some(function (l) { return l.id === localSel; })) localSel = '';
+      sel.value = localSel;
+      $('#p-limpar', raiz).hidden = !localSel && situacao === 'TODAS';
+    }
+    function passaSituacao(s) {
+      if (situacao === 'TODAS') return true;
+      if (situacao === 'SEM') return !s.urna && s.ativo;
+      return s.urna && s.urna.status === situacao;
+    }
 
     function opcoesMunicipio(dados) {
       var cfg = dados.config || {};
@@ -131,13 +161,14 @@ var Painel = (function () {
       if (sel.innerHTML !== html) sel.innerHTML = html;
       sel.value = municipio;
       if (sel.value !== municipio) { municipio = principal; sel.value = principal; }
-      sel.hidden = lista.length < 2;
+      sel.closest('.filtro').hidden = lista.length < 2;
     }
 
     function atualizar(dados) {
       ultimo = dados;
       opcoesMunicipio(dados);
-      var st = calcular(dados, municipio);
+      opcoesLocal(dados);
+      var st = calcular(dados, municipio, localSel);
       var nomeCand = (dados.config && dados.config.candidato_nome) || 'Fabricio Petri';
 
       // Outros municípios
@@ -282,11 +313,12 @@ var Painel = (function () {
     }
 
     function desenharMapa(st) {
-      var ls = st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
+      var ls = st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); })
+        .filter(function (l) { return l.secoes.some(passaSituacao); });
       var dups = opcoes.duplicadas ? opcoes.duplicadas() : {};
       $('#p-mapa', raiz).innerHTML = ls.length ? ls.map(function (l) {
         return '<div class="mapa-local"><div class="cab"><b>' + h(l.nome) + '</b><span>' + (l.val + l.pen) + '/' + l.total + '</span></div><div class="chips">' +
-          l.secoes.map(function (s) {
+          l.secoes.filter(passaSituacao).map(function (s) {
             var u = s.urna, cls = u ? u.status : '', tit = 'Seção ' + s.numero;
             if (u) tit += ' · ' + App.n(u.votos) + ' votos · ' + (u.status === 'VALIDADO' ? 'confirmado' : 'em conferência') + ' · ' + App.hora(u.recebido_em);
             else tit += ' · sem envio';
@@ -294,12 +326,13 @@ var Painel = (function () {
             return '<' + tag + ' class="chip ' + cls + (dups[s.id] ? ' dup' : '') + (s.ativo ? '' : ' inativa') + '" title="' + h(tit) + '"' + (tag === 'button' ? ' data-secao="' + h(s.id) + '"' : '') + '>' + h(s.numero) +
               (u ? '<small class="num">' + App.n(u.votos) + '</small>' : '<small>—</small>') + '</' + tag + '>';
           }).join('') + '</div></div>';
-      }).join('') : '<div class="vazio">Nenhuma seção cadastrada para este município.</div>';
+      }).join('') : '<div class="vazio">' + (situacao !== 'TODAS' ? 'Nenhuma urna nessa situação.' : 'Nenhuma seção cadastrada para este filtro.') + '</div>';
       if (opcoes.aoClicarSecao) App.$$('[data-secao]', raiz).forEach(function (b) { b.onclick = function () { opcoes.aoClicarSecao(b.dataset.secao); }; });
     }
 
     function desenharTabela(st) {
-      var ls = st.locais.slice().sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+      var ls = st.locais.slice().sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); })
+        .filter(function (l) { return l.secoes.some(passaSituacao); });
       var t = { total: 0, val: 0, pen: 0, vv: 0, vp: 0 };
       var corpo = ls.map(function (l) {
         t.total += l.total; t.val += l.val; t.pen += l.pen; t.vv += l.votosVal; t.vp += l.votosPen;

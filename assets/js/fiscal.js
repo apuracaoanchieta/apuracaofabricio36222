@@ -50,7 +50,7 @@
     }).catch(function (e) {
       if (params) { montarParams(); if (!silencioso) avisoConexao(); }
       else {
-        $('#f-local').innerHTML = '<option value="">Sem conexão — não foi possível carregar</option>';
+        $('#f-local-busca').placeholder = 'Sem conexão — não foi possível carregar';
         avisoConexao(true);
       }
       if (e.servidor) App.toast(e.message, 'erro');
@@ -73,12 +73,95 @@
     $('#fechado').hidden = !fechado;
     $('#form-bu').hidden = fechado;
     var sel = $('#f-local'), atual = sel.value || App.lsGet(K_ULT_LOCAL, '');
-    sel.innerHTML = '<option value="">Escolha o local de votação</option>' + params.locais.map(function (l) {
+    sel.innerHTML = '<option value=""></option>' + params.locais.map(function (l) {
       return '<option value="' + h(l.id) + '">' + h(l.nome) + '</option>';
     }).join('');
     if (atual && params.locais.some(function (l) { return l.id === atual; })) sel.value = atual;
+    Combo.atualizar();
     montarSecoes();
   }
+
+  /* ---------------- Busca do local de votação ---------------- */
+  var Combo = (function () {
+    var inp = $('#f-local-busca'), lista = $('#combo-lista'), limpar = $('#combo-limpar'), sel = $('#f-local');
+    var itens = [], ativo = -1;
+    function nomeAtual() {
+      var l = params && params.locais.filter(function (x) { return x.id === sel.value; })[0];
+      return l ? l.nome : '';
+    }
+    function marcar(txt, q) {
+      if (!q) return h(txt);
+      var n = Core.norm(txt), i = n.indexOf(q);
+      if (i < 0) return h(txt);
+      return h(txt.slice(0, i)) + '<mark>' + h(txt.slice(i, i + q.length)) + '</mark>' + h(txt.slice(i + q.length));
+    }
+    function abrir() {
+      if (!params) return;
+      var txt = inp.value.trim(), q = txt === nomeAtual() ? '' : Core.norm(txt);
+      var palavras = q.split(' ').filter(Boolean);
+      itens = params.locais.filter(function (l) {
+        var n = Core.norm(l.nome);
+        return palavras.every(function (p) { return n.indexOf(p) >= 0; });
+      });
+      ativo = itens.length ? 0 : -1;
+      lista.innerHTML = itens.length ? itens.map(function (l, i) {
+        var qtd = params.secoes.filter(function (s) { return s.local_id === l.id; }).length;
+        return '<li role="option" id="op-' + i + '" data-i="' + i + '" class="' + (i === ativo ? 'ativo' : '') + (l.id === sel.value ? ' escolhido' : '') + '">' +
+          '<span>' + marcar(l.nome, palavras.length === 1 ? palavras[0] : '') + '</span><small>' + qtd + ' seç' + (qtd === 1 ? 'ão' : 'ões') + '</small></li>';
+      }).join('') : '<li class="combo-vazio">Nenhum local encontrado com "' + h(txt) + '"</li>';
+      lista.hidden = false;
+      inp.setAttribute('aria-expanded', 'true');
+    }
+    function fechar() { lista.hidden = true; inp.setAttribute('aria-expanded', 'false'); }
+    function escolher(l) {
+      sel.value = l ? l.id : '';
+      inp.value = l ? l.nome : '';
+      inp.classList.remove('erro');
+      limpar.hidden = !inp.value;
+      fechar();
+      sel.dispatchEvent(new Event('change'));
+    }
+    function moverAtivo(d) {
+      if (!itens.length) return;
+      ativo = (ativo + d + itens.length) % itens.length;
+      App.$$('li[data-i]', lista).forEach(function (li) { li.classList.toggle('ativo', Number(li.dataset.i) === ativo); });
+      var li = $('#op-' + ativo); if (li) li.scrollIntoView({ block: 'nearest' });
+    }
+    inp.addEventListener('focus', function () { inp.select(); abrir(); });
+    inp.addEventListener('input', function () { limpar.hidden = !inp.value; abrir(); });
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (lista.hidden) abrir(); else moverAtivo(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moverAtivo(-1); }
+      else if (e.key === 'Enter') { if (!lista.hidden && itens[ativo]) { e.preventDefault(); escolher(itens[ativo]); $('#f-secao').focus(); } }
+      else if (e.key === 'Escape') { fechar(); }
+    });
+    lista.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    lista.addEventListener('click', function (e) {
+      var li = e.target.closest('li[data-i]');
+      if (li) escolher(itens[Number(li.dataset.i)]);
+    });
+    inp.addEventListener('blur', function () {
+      setTimeout(function () {
+        if (!lista.hidden) fechar();
+        var txt = inp.value.trim();
+        if (!txt) { if (sel.value) escolher(null); return; }
+        if (txt === nomeAtual()) return;
+        // digitou e saiu: se só um local combina, escolhe; senão volta ao local escolhido
+        var q = Core.norm(txt);
+        var bate = params ? params.locais.filter(function (l) { return Core.norm(l.nome).indexOf(q) >= 0; }) : [];
+        if (bate.length === 1) escolher(bate[0]); else { inp.value = nomeAtual(); limpar.hidden = !inp.value; }
+      }, 120);
+    });
+    limpar.addEventListener('click', function () { escolher(null); inp.focus(); });
+    return {
+      atualizar: function () {
+        inp.disabled = !params;
+        inp.placeholder = 'Digite para buscar o local';
+        if (document.activeElement !== inp) inp.value = nomeAtual();
+        limpar.hidden = !inp.value;
+      }
+    };
+  })();
 
   function recebidasSet() {
     var s = {};
@@ -148,7 +231,7 @@
     if (nome.length < 3) { erros.push('Informe seu nome.'); $('#f-nome').classList.add('erro'); }
     if (telefone.length < 10) { erros.push('Informe o telefone com DDD.'); $('#f-tel').classList.add('erro'); }
     if (erros.length && $('#ident-campos').hidden) { $('#ident-resumo').hidden = true; $('#ident-campos').hidden = false; }
-    if (!localId) { erros.push('Escolha o local de votação.'); $('#f-local').classList.add('erro'); }
+    if (!localId) { erros.push('Escolha o local de votação.'); $('#f-local-busca').classList.add('erro'); }
     if (!secaoId) { erros.push('Escolha a seção.'); $('#f-secao').classList.add('erro'); }
     if (votos === '') { erros.push('Digite a quantidade de votos.'); $('.votos-box').style.borderColor = 'var(--perigo)'; }
     if (!foto && String(cfg.foto_obrigatoria).toUpperCase() !== 'FALSE') { erros.push('Tire a foto do boletim de urna.'); $('#foto-area').classList.add('erro'); }

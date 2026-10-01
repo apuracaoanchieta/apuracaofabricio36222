@@ -23,7 +23,7 @@
     }).catch(function (err) { App.toast(err.message, 'erro'); }).then(function () { App.carregando(b, false); });
   });
   $('#btn-sair').addEventListener('click', function () {
-    App.sessao.sair(AREA); sess = null; clearInterval(timer); telaLogin();
+    App.sessao.sair(AREA); sess = null; clearInterval(timer); location.href = './';
   });
 
   function iniciar() {

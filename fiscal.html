@@ -52,8 +52,15 @@
 
       <div class="card-titulo" style="margin-top:22px"><h2>Boletim de Urna</h2></div>
       <div class="campo">
-        <label for="f-local">Local de votação</label>
-        <select class="input" id="f-local"><option value="">Carregando locais…</option></select>
+        <label for="f-local-busca">Local de votação</label>
+        <div class="combo" id="combo-local">
+          <input class="input combo-input" id="f-local-busca" type="text" placeholder="Carregando locais…" autocomplete="off" autocapitalize="characters" spellcheck="false"
+            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="combo-lista" disabled>
+          <button type="button" class="combo-limpar" id="combo-limpar" aria-label="Limpar busca" hidden>×</button>
+          <ul class="combo-lista" id="combo-lista" role="listbox" hidden></ul>
+        </div>
+        <select id="f-local" hidden aria-hidden="true" tabindex="-1"><option value=""></option></select>
+        <div class="ajuda">Digite parte do nome (ex.: "pongal", "jocelina") e toque no local.</div>
       </div>
       <div class="campo">
         <label for="f-secao">Seção eleitoral</label>
