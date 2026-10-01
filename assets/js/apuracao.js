@@ -726,16 +726,56 @@
   }
 
   function modalImportar() {
-    var m = App.modal(App.cabecalhoModal('Importar locais e seções', 'Cadastre várias seções de uma vez.') +
+    var m = App.modal(App.cabecalhoModal('Importar locais e seções', 'Cadastre ou atualize várias seções de uma vez.') +
       '<div class="campo"><label for="mi-mun">Município</label><input class="input" id="mi-mun" value="' + h(paramMun) + '" list="mi-dl"><datalist id="mi-dl">' + municipiosConhecidos().map(function (x) { return '<option value="' + h(x) + '">'; }).join('') + '</datalist></div>' +
       '<div class="campo"><label for="mi-txt">Uma seção por linha: LOCAL;SEÇÃO</label><textarea class="input" id="mi-txt" rows="8" placeholder="ESCOLA SÃO JOSÉ;12&#10;ESCOLA SÃO JOSÉ;13&#10;GINÁSIO MUNICIPAL;40"></textarea>' +
-      '<div class="ajuda">Dica: copie duas colunas do Excel/Sheets (local e seção) e cole aqui. Locais novos são criados automaticamente; seções já existentes são ignoradas.</div></div>' +
-      '<div class="acoes"><button class="btn btn-sec" data-fechar>Cancelar</button><button class="btn btn-azul" id="mi-ok">' + ICON.upload + 'Importar</button></div>');
+      '<div class="ajuda">Dica: copie duas colunas do Excel/Sheets (local e seção) e cole aqui.</div></div>' +
+      '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px"><div><b>Substituir a lista inteira deste município</b>' +
+      '<span>Locais com as mesmas seções são <strong>renomeados</strong>, seções novas são criadas e o que não estiver na lista é <strong>desativado</strong> (nada é excluído; envios já feitos são mantidos). Desligado: só acrescenta.</span></div>' +
+      '<label class="switch"><input type="checkbox" id="mi-subst"><span class="trilho"></span></label></div>' +
+      '<div id="mi-plano"></div>' +
+      '<div class="acoes"><button class="btn btn-sec" data-fechar>Cancelar</button><button class="btn btn-azul" id="mi-ok">' + ICON.upload + 'Importar</button></div>', { classe: 'largo' });
+    var confirmando = false;
+    function resetar() { confirmando = false; $('#mi-plano', m.el).innerHTML = ''; $('#mi-ok', m.el).innerHTML = ICON.upload + ($('#mi-subst', m.el).checked ? 'Ver o que vai mudar' : 'Importar'); }
+    $('#mi-subst', m.el).onchange = resetar; $('#mi-txt', m.el).oninput = function () { if (confirmando) resetar(); };
+    $('#mi-mun', m.el).oninput = function () { if (confirmando) resetar(); };
+    function lista(titulo, itens, fmt, cor) {
+      if (!itens.length) return '';
+      return '<details' + (itens.length <= 12 ? ' open' : '') + ' style="margin:6px 0"><summary style="cursor:pointer;font-weight:700;color:' + (cor || 'inherit') + '">' + titulo + ' (' + itens.length + ')</summary>' +
+        '<ul style="margin:6px 0 0;padding-left:20px;font-size:13px;max-height:220px;overflow:auto">' + itens.map(function (x) { return '<li>' + fmt(x) + '</li>'; }).join('') + '</ul></details>';
+    }
+    function mostrarPlano(p) {
+      var nada = !p.renomear.length && !p.criarLocal.length && !p.criarSecao.length && !p.moverSecao.length && !p.desativarSecao.length && !p.desativarLocal.length && !p.reativar.length;
+      $('#mi-plano', m.el).innerHTML = '<div class="aviso ' + (p.desativarSecao.length || p.desativarLocal.length ? 'aviso-alerta' : 'aviso-info') + '" style="display:block">' +
+        '<b style="margin-bottom:4px">Resultado: ' + p.totalLocais + ' locais e ' + p.totalSecoes + ' seções.' + (nada ? ' A lista já está igual — nada muda.' : '') + '</b>' +
+        lista('Locais renomeados', p.renomear, function (x) { return h(x.de) + ' → <b>' + h(x.para) + '</b>'; }) +
+        lista('Locais novos', p.criarLocal, function (x) { return '<b>' + h(x) + '</b>'; }) +
+        lista('Seções novas', p.criarSecao, function (x) { return 'Seção <b>' + h(x.numero) + '</b> em ' + h(x.local); }, '#0b6b49') +
+        lista('Seções que mudam de local', p.moverSecao, function (x) { return 'Seção ' + h(x.numero) + ': ' + h(x.de) + ' → ' + h(x.para); }) +
+        lista('Reativados', p.reativar, function (x) { return x.tipo === 'local' ? 'Local ' + h(x.nome) : 'Seção ' + h(x.numero); }) +
+        lista('Seções que serão desativadas', p.desativarSecao, function (x) { return 'Seção ' + h(x.numero) + ' (' + h(x.local) + ')'; }, '#b34700') +
+        lista('Locais que serão desativados', p.desativarLocal, function (x) { return h(x); }, '#b34700') + '</div>';
+    }
     $('#mi-ok', m.el).onclick = function () {
-      var b = this; App.carregando(b, true, 'Importando…');
-      chamar('apuracao.importar', { municipio: $('#mi-mun', m.el).value, texto: $('#mi-txt', m.el).value }).then(function (r) {
-        App.toast(r.criadas + ' seções criadas' + (r.existentes ? ', ' + r.existentes + ' já existiam' : '') + '.', 'ok', 5000);
-        if (r.erros.length) App.toast(r.erros.slice(0, 3).join(' | '), 'erro', 8000);
+      var b = this, subst = $('#mi-subst', m.el).checked;
+      var dados0 = { municipio: $('#mi-mun', m.el).value, texto: $('#mi-txt', m.el).value, substituir: subst, simular: subst && !confirmando };
+      App.carregando(b, true, dados0.simular ? 'Analisando…' : 'Importando…');
+      chamar('apuracao.importar', dados0).then(function (r) {
+        if (r.erros && r.erros.length && subst) {
+          App.carregando(b, false);
+          $('#mi-plano', m.el).innerHTML = '<div class="aviso aviso-perigo" style="display:block"><b>Corrija a lista antes de continuar:</b><ul style="margin:6px 0 0;padding-left:20px;font-size:13px">' + r.erros.slice(0, 15).map(function (e) { return '<li>' + h(e) + '</li>'; }).join('') + '</ul></div>';
+          return;
+        }
+        if (r.simulado) {
+          mostrarPlano(r.plano); confirmando = true;
+          App.carregando(b, false); b.innerHTML = ICON.check + 'Confirmar e aplicar';
+          return;
+        }
+        if (subst) App.toast('Lista atualizada: ' + r.plano.totalLocais + ' locais, ' + r.plano.totalSecoes + ' seções.', 'ok', 6000);
+        else {
+          App.toast(r.criadas + ' seções criadas' + (r.existentes ? ', ' + r.existentes + ' já existiam' : '') + '.', 'ok', 5000);
+          if (r.erros.length) App.toast(r.erros.slice(0, 3).join(' | '), 'erro', 8000);
+        }
         paramMun = $('#mi-mun', m.el).value.trim().toUpperCase(); m.fechar(); recarregarParametros();
       }).catch(function (e) { App.toast(e.message, 'erro'); App.carregando(b, false); });
     };

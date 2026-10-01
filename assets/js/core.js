@@ -42,40 +42,40 @@ var Core = (function () {
   ];
   var CONFIG_INTERNA = { pasta_fotos_id: true };
 
-  /* Locais e seções de Anchieta (base: eleição 2024) */
+  /* Locais e seções de Anchieta — Zona 17 (relação 2026) */
   var SEED = [
-    ['ALTO PONGAL', [28, 29, 73]],
-    ['AMARILIS', [6, 10, 33, 35, 40, 57, 60, 140]],
-    ['BAIXO PONGAL', [23, 50]],
-    ['TOM E JERRY (BELMIRO) - IRIRI', [66, 79]],
-    ['BELO HORIZONTE', [14]],
-    ['CASTELHANOS', [68, 137]],
-    ['CHAPADA DO Á', [16, 75]],
-    ['CORONEL', [3, 4, 7, 8, 69, 83, 138, 170]],
-    ['CÓRREGO DA PRATA', [27]],
-    ['DOIS IRMÃOS DE PONGAL', [30]],
-    ['DUAS BARRAS', [19]],
-    ['FRANCISCO GIUSTI', [67, 77]],
-    ['GOEMBÊ', [15, 78]],
-    ['ITAPEROROMA BAIXA', [22, 72]],
-    ['ITAPEÚNA', [24]],
-    ['JABAQUARA', [17, 18, 38]],
-    ['JABAQUARA (ITAJOBAIA)', [144]],
-    ['JOCELINA NOGUEIRA', [44, 46, 48, 51, 54, 63, 133]],
-    ['JOEBA', [31]],
-    ['LIMEIRA', [43, 62]],
-    ['MÃE-BÁ', [13, 41, 53, 71]],
-    ['MANOEL DE PAULA SERRÃO - IRIRI', [25, 26, 36, 42, 49, 55, 141]],
-    ['NOVO HORIZONTE', [132, 168]],
-    ['NOVO HORIZONTE (TEREZINHA GODOY)', [1, 2, 5, 9, 32, 34, 39, 47, 56, 139]],
-    ['OLIVÂNIA', [20, 74]],
-    ['PARATI', [64, 146]],
-    ['PLANALTO/NOVA ANCHIETA', [65, 80, 142, 147, 169]],
-    ['PONTA DOS CASTELHANOS', [58, 61, 82]],
-    ['RECANTO DO SOL', [52, 59, 81]],
-    ['SIMPATIA', [21, 37, 130]],
-    ['TIU LILIU', [70, 128]],
-    ['UBU', [11, 12, 45]]
+    ['CEMEI ENIDE CORREA GUAITOLINI', [13, 41, 53, 71]],
+    ['CEMEI TIA IRENI AMARAL', [67, 77]],
+    ['EE CORONEL GOMES OLIVEIRA', [3, 4, 7, 8, 69, 83, 138, 170]],
+    ['EM AMARILIS FERNANDES GARCIA', [6, 10, 33, 35, 40, 57, 60, 140, 173]],
+    ['EM DE ALTO JOEBA', [31]],
+    ['EM DE ALTO PONGAL', [28, 29, 73]],
+    ['EM DE BAIXO PONGAL', [23, 50]],
+    ['EM DE BELO HORIZONTE', [14]],
+    ['EM DE CHAPADA DO Á', [16, 75]],
+    ['EM DE CÓRREGO DA PRATA', [27]],
+    ['EM DE DOIS IRMÃOS', [30]],
+    ['EM DE GOEMBÊ', [15, 78]],
+    ['EM DE ITAJOBAIA', [144]],
+    ['EM DE ITAPEROROMA BAIXA', [22, 72]],
+    ['EM DE ITAPEÚNA', [24, 76]],
+    ['EM DE LIMEIRA', [43, 62]],
+    ['EM DE NOVO HORIZONTE', [132, 168]],
+    ['EM DE PARATI', [64, 146]],
+    ['EM DE RECANTO DO SOL', [52, 59, 81]],
+    ['EM DE SIMPATIA', [21, 37, 130]],
+    ['EM DE UBÚ', [11, 12, 45]],
+    ['EM INFANTIL TIO LILIO', [70, 128]],
+    ['EM JOCELINA NOGUEIRA', [44, 46, 48, 51, 54, 63, 133]],
+    ['EM PROF. DULCINEA SILVA LYRIO RUPF', [58, 61, 82]],
+    ['EM TEREZINHA GODOY DE ALMEIDA', [1, 2, 5, 9, 32, 34, 39, 47, 56, 139]],
+    ['EMEB ALCIDES CECCON', [68, 137, 171]],
+    ['EMEB DUAS BARRAS', [19]],
+    ['EMEF MANOEL DE PAULA SERRÃO', [25, 26, 36, 42, 49, 55, 141]],
+    ['EMEI BELMIRO ALBERTO ALPOIM', [66, 79]],
+    ['EMEIEF PLANALTO', [65, 80, 142, 147, 169]],
+    ['ESCOLA AGRÍCOLA DE OLIVÂNIA', [20, 74]],
+    ['ESF JABAQUARA (UNIDADE DE SAÚDE)', [17, 18, 38]]
   ];
 
   /* ------------------------------------------------------------------ */
@@ -582,10 +582,112 @@ var Core = (function () {
   };
 
   /* Importação em lote: uma linha por seção, "LOCAL;SEÇÃO" */
+  /* Substitui a lista de locais/seções de um município.
+   * Casa os locais pelo NÚMERO DAS SEÇÕES (únicos no município): um local antigo que tinha
+   * as mesmas seções é RENOMEADO (mantém o id e os envios ligados a ele). Seções novas são criadas,
+   * seções/locais que não estão na lista são DESATIVADOS (nunca excluídos). */
+  function substituirLista(db, u, mun, texto, simular) {
+    var novos = [], porNome = {}, erros = [], vistas = {};
+    texto.split(/\r?\n/).forEach(function (linha, i) {
+      if (!linha.trim()) return;
+      var partes = linha.split(/[;\t]/);
+      var num = int(partes[partes.length - 1]);
+      var nome = str(partes.slice(0, partes.length - 1).join(' ')).replace(/\s+/g, ' ').toUpperCase();
+      if (partes.length < 2 || !nome || isNaN(num) || num <= 0) { erros.push('Linha ' + (i + 1) + ': use LOCAL;SEÇÃO'); return; }
+      if (vistas[num]) { erros.push('Linha ' + (i + 1) + ': seção ' + num + ' repetida (já está em ' + vistas[num] + ')'); return; }
+      vistas[num] = nome;
+      var k = norm(nome);
+      if (!porNome[k]) { porNome[k] = { nome: nome, secoes: [] }; novos.push(porNome[k]); }
+      porNome[k].secoes.push(String(num));
+    });
+    if (erros.length) return { simulado: true, erros: erros, plano: null };
+    if (!novos.length) throw erro('A lista está vazia.');
+
+    return db.lock(function () {
+      var locais = mapLocais(db).filter(function (l) { return norm(l.municipio) === norm(mun); });
+      var idsMun = {}; locais.forEach(function (l) { idsMun[l.id] = l; });
+      var secoes = mapSecoes(db).filter(function (s) { return idsMun[s.local_id]; });
+      var secPorNum = {}; secoes.forEach(function (s) { secPorNum[s.numero] = s; });
+      var usados = {}, plano = { renomear: [], criarLocal: [], manter: [], criarSecao: [], moverSecao: [], reativar: [], desativarSecao: [], desativarLocal: [] };
+
+      // 1) escolhe qual local antigo corresponde a cada local novo
+      novos.forEach(function (nv) {
+        var votos = {};
+        nv.secoes.forEach(function (n) { var s = secPorNum[n]; if (s && !usados[s.local_id]) votos[s.local_id] = (votos[s.local_id] || 0) + 1; });
+        var melhor = null;
+        Object.keys(votos).forEach(function (id) { if (!melhor || votos[id] > votos[melhor]) melhor = id; });
+        if (!melhor) { var mesmo = find(locais, function (l) { return !usados[l.id] && norm(l.nome) === norm(nv.nome); }); if (mesmo) melhor = mesmo.id; }
+        if (melhor) {
+          usados[melhor] = true; nv.id = melhor;
+          var ant = idsMun[melhor];
+          if (norm(ant.nome) !== norm(nv.nome)) plano.renomear.push({ id: melhor, de: ant.nome, para: nv.nome });
+          else plano.manter.push(nv.nome);
+          if (!ant.ativo) plano.reativar.push({ tipo: 'local', id: melhor, nome: nv.nome });
+        } else { nv.id = null; plano.criarLocal.push(nv.nome); }
+      });
+      // 2) seções
+      var naLista = {};
+      novos.forEach(function (nv) {
+        nv.secoes.forEach(function (n) {
+          naLista[n] = true;
+          var s = secPorNum[n];
+          if (!s) plano.criarSecao.push({ numero: n, local: nv.nome });
+          else {
+            if (s.local_id !== nv.id) plano.moverSecao.push({ numero: n, de: idsMun[s.local_id].nome, para: nv.nome });
+            if (!s.ativo) plano.reativar.push({ tipo: 'secao', numero: n });
+          }
+        });
+      });
+      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) plano.desativarSecao.push({ numero: s.numero, local: idsMun[s.local_id].nome }); });
+      locais.forEach(function (l) { if (!usados[l.id] && l.ativo) plano.desativarLocal.push(l.nome); });
+      plano.totalLocais = novos.length;
+      plano.totalSecoes = Object.keys(naLista).length;
+
+      if (simular) return { simulado: true, plano: plano, erros: [] };
+
+      // 3) aplica
+      novos.forEach(function (nv) {
+        if (nv.id) {
+          var l = idsMun[nv.id];
+          db.update('LOCAIS', l._row, { id: l.id, municipio: l.municipio, nome: nv.nome, ativo: 'TRUE' });
+        } else {
+          nv.id = 'L' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
+          db.append('LOCAIS', { id: nv.id, municipio: mun, nome: nv.nome, ativo: 'TRUE' });
+        }
+      });
+      var localNovoDaSecao = {};
+      novos.forEach(function (nv) {
+        nv.secoes.forEach(function (n) {
+          var s = secPorNum[n];
+          localNovoDaSecao[n] = nv;
+          if (!s) db.append('SECOES', { id: 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase(), local_id: nv.id, numero: n, ativo: 'TRUE' });
+          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, { id: s.id, local_id: nv.id, numero: s.numero, ativo: 'TRUE' });
+        });
+      });
+      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, { id: s.id, local_id: s.local_id, numero: s.numero, ativo: 'FALSE' }); });
+      locais.forEach(function (l) { if (!usados[l.id] && l.ativo) db.update('LOCAIS', l._row, { id: l.id, municipio: l.municipio, nome: l.nome, ativo: 'FALSE' }); });
+      // mantém os envios já registrados apontando para o local/nome certos
+      var nomePorId = {}; novos.forEach(function (nv) { nomePorId[nv.id] = nv.nome; });
+      mapLancamentos(db).forEach(function (lc) {
+        var s = find(secoes, function (x) { return x.id === lc.secao_id; });
+        var alvo = s && localNovoDaSecao[s.numero] ? localNovoDaSecao[s.numero] : null;
+        var novoId = alvo ? alvo.id : lc.local_id, novoNome = nomePorId[novoId];
+        if (novoNome && (lc.local_id !== novoId || lc.local !== novoNome)) {
+          lc.local_id = novoId; lc.local = novoNome;
+          db.update('LANCAMENTOS', lc._row, rowLanc(lc));
+        }
+      });
+      log(db, u.usuario, 'SUBSTITUIR_LISTA', mun + ': ' + novos.length + ' locais, ' + plano.totalSecoes + ' seções; ' +
+        plano.renomear.length + ' renomeados, ' + plano.criarSecao.length + ' seções novas, ' + plano.desativarSecao.length + ' seções desativadas');
+      return { simulado: false, plano: plano, erros: [] };
+    });
+  }
+
   ACOES['apuracao.importar'] = function (db, req) {
     var u = exigeApuracao(db, req);
     var mun = str(req.municipio).toUpperCase();
     if (!mun) throw erro('Informe o município.');
+    if (req.substituir) return substituirLista(db, u, mun, str(req.texto), !!req.simular);
     return db.lock(function () {
       var criadas = 0, existentes = 0, erros = [];
       str(req.texto).split(/\r?\n/).forEach(function (linha, i) {
