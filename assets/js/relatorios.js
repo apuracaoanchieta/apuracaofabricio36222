@@ -25,7 +25,7 @@ var Relat = (function () {
       st.locais.sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); });
       return st;
     }).filter(function (st) { return st.totalUrnas || st.votosVal || st.votosPen; });
-    var tot = { votosVal: 0, votosPen: 0, apuradas: 0, totalUrnas: 0, urnasVal: 0, urnasPen: 0 };
+    var tot = { votosVal: 0, votosPen: 0, apuradas: 0, totalUrnas: 0, urnasVal: 0, urnasPen: 0, aptosTotal: 0, aptosApur: 0, votosSecComAptos: 0 };
     lista.forEach(function (st) { Object.keys(tot).forEach(function (k) { tot[k] += st[k] || 0; }); });
     return { config: d.config, municipios: lista, total: tot, agora: d.agora, urnasPorSecao: v._urnasPorSecao };
   }
@@ -40,6 +40,7 @@ var Relat = (function () {
   }
   function dataBr(stamp) { if (!stamp) return ''; var s = String(stamp); return s.substr(8, 2) + '/' + s.substr(5, 2) + '/' + s.substr(0, 4) + ' ' + s.substr(11, 8); }
   function linkFoto(id) { return id && !/^DEMO-|^F[0-9a-f]{8}$/.test(id) ? 'https://drive.google.com/file/d/' + id + '/view' : ''; }
+  function p1(a, b) { return b ? Math.round(a / b * 1000) / 10 : ''; }
   function folha(linhas, larguras) {
     var ws = XLSX.utils.aoa_to_sheet(linhas);
     ws['!cols'] = larguras.map(function (w) { return { wch: w }; });
@@ -57,36 +58,39 @@ var Relat = (function () {
       ];
 
       // 1. Resumo por município
-      var res = cab.concat([['Município', 'Urnas apuradas', 'Total de urnas', '% apurado', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Inclui totais informados']]);
+      var res = cab.concat([['Município', 'Urnas apuradas', 'Total de urnas', '% apurado', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Inclui totais informados', 'Eleitores aptos', '% do eleitorado apurado', '% dos aptos (seções apuradas)']]);
       r.municipios.forEach(function (st) {
-        res.push([st.municipio, st.apuradas, st.totalUrnas, st.totalUrnas ? Math.round(st.apuradas / st.totalUrnas * 1000) / 10 : '', st.votosVal, st.votosPen, st.votosVal + st.votosPen, st.votosTotais || '']);
+        res.push([st.municipio, st.apuradas, st.totalUrnas, p1(st.apuradas, st.totalUrnas), st.votosVal, st.votosPen, st.votosVal + st.votosPen, st.votosTotais || '',
+          st.aptosTotal || '', p1(st.aptosApur, st.aptosTotal), p1(st.votosSecComAptos, st.aptosApur)]);
       });
-      res.push(['TOTAL', r.total.apuradas, r.total.totalUrnas, r.total.totalUrnas ? Math.round(r.total.apuradas / r.total.totalUrnas * 1000) / 10 : '', r.total.votosVal, r.total.votosPen, r.total.votosVal + r.total.votosPen, '']);
-      XLSX.utils.book_append_sheet(wb, folha(res, [26, 15, 15, 11, 18, 20, 15, 22]), 'Resumo');
+      res.push(['TOTAL', r.total.apuradas, r.total.totalUrnas, p1(r.total.apuradas, r.total.totalUrnas), r.total.votosVal, r.total.votosPen, r.total.votosVal + r.total.votosPen, '',
+        r.total.aptosTotal || '', p1(r.total.aptosApur, r.total.aptosTotal), p1(r.total.votosSecComAptos, r.total.aptosApur)]);
+      XLSX.utils.book_append_sheet(wb, folha(res, [26, 15, 15, 11, 18, 20, 15, 22, 15, 22, 26]), 'Resumo');
 
       // 2. Por local
-      var pl = cab.concat([['Município', 'Local de votação', 'Urnas apuradas', 'Total de urnas', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Total informado (sem seção)', 'Média por urna']]);
+      var pl = cab.concat([['Município', 'Local de votação', 'Urnas apuradas', 'Total de urnas', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Total informado (sem seção)', 'Média por urna', 'Eleitores aptos', '% dos aptos (seções apuradas)']]);
       r.municipios.forEach(function (st) {
         st.locais.forEach(function (l) {
           var ap = l.val + l.pen;
-          pl.push([st.municipio, l.nome, ap, l.total, l.votosVal, l.votosPen, l.votosVal + l.votosPen, l.totalInformado || '', ap ? Math.round((l.votosVal + l.votosPen - (l.totalInformado || 0)) / ap) : '']);
+          pl.push([st.municipio, l.nome, ap, l.total, l.votosVal, l.votosPen, l.votosVal + l.votosPen, l.totalInformado || '', ap ? Math.round((l.votosVal + l.votosPen - (l.totalInformado || 0)) / ap) : '',
+            l.aptos || '', p1(l.votosSec, l.aptosApur)]);
         });
       });
-      XLSX.utils.book_append_sheet(wb, folha(pl, [18, 36, 14, 14, 18, 20, 14, 24, 14]), 'Por local');
+      XLSX.utils.book_append_sheet(wb, folha(pl, [18, 36, 14, 14, 18, 20, 14, 24, 14, 14, 26]), 'Por local');
 
       // 3. Por seção (inclui seções sem envio)
-      var ps = cab.concat([['Município', 'Local de votação', 'Seção', 'Situação', 'Votos', 'Fiscal / quem informou', 'Telefone', 'Recebido em', 'Conferido por', 'Conferido em', 'Foto do BU']]);
+      var ps = cab.concat([['Município', 'Local de votação', 'Seção', 'Situação', 'Votos', 'Eleitores aptos', '% dos aptos', 'Fiscal / quem informou', 'Telefone', 'Recebido em', 'Conferido por', 'Conferido em', 'Foto do BU']]);
       r.municipios.forEach(function (st) {
         st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).forEach(function (l) {
           l.secoes.forEach(function (s) {
             var u = s.urna;
-            ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, u ? ROT[u.status] : (s.ativo ? 'Sem envio' : 'Seção inativa'), u ? u.votos : '',
+            ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, u ? ROT[u.status] : (s.ativo ? 'Sem envio' : 'Seção inativa'), u ? u.votos : '', s.aptos || '', u && s.aptos ? p1(u.votos, s.aptos) : '',
               u ? u.nome : '', u ? App.tel(u.telefone) : '', u ? dataBr(u.recebido_em) : '', u ? u.validado_por : '', u ? dataBr(u.validado_em) : '', u ? linkFoto(u.foto_id) : '']);
           });
-          if (l.totalInformado) ps.push([st.municipio, l.nome, 'TOTAL', 'Total informado (' + (ROT[l.totalStatus] || '').toLowerCase() + ')', l.totalInformado, '', '', '', '', '', '']);
+          if (l.totalInformado) ps.push([st.municipio, l.nome, 'TOTAL', 'Total informado (' + (ROT[l.totalStatus] || '').toLowerCase() + ')', l.totalInformado, '', '', '', '', '', '', '', '']);
         });
       });
-      XLSX.utils.book_append_sheet(wb, folha(ps, [18, 36, 8, 18, 9, 26, 17, 20, 14, 20, 48]), 'Por seção');
+      XLSX.utils.book_append_sheet(wb, folha(ps, [18, 36, 8, 18, 9, 14, 11, 26, 17, 20, 14, 20, 48]), 'Por seção');
 
       // 4. Todos os envios (histórico completo)
       var te = cab.concat([['ID', 'Recebido em', 'Origem', 'Fiscal / quem informou', 'Telefone', 'Município', 'Local de votação', 'Seção', 'Votos', 'Votos informados pelo fiscal', 'Status', 'Conferido por', 'Conferido em', 'Observação', 'Foto do BU']]);

@@ -250,7 +250,8 @@
     var jaEnviada = recebidasSet()[secaoId];
 
     var m = App.modal(App.cabecalhoModal('Confira antes de enviar', 'Compare cada dado com o boletim impresso.') +
-      (alertaAtivo && v > limite ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Valor alto</b>' + App.n(v) + ' votos é acima do esperado para uma seção (' + App.n(limite) + '). Confira se digitou certo.</div></div>' : '') +
+      (Number(secao.aptos) > 0 && v > Number(secao.aptos) ? '<div class="aviso aviso-perigo">' + ICON.alerta + '<div><b>Mais votos que eleitores</b>A seção ' + h(secao.numero) + ' tem só ' + App.n(Number(secao.aptos)) + ' eleitores aptos e você digitou ' + App.n(v) + ' votos. Confira o número no boletim.</div></div>' :
+      alertaAtivo && v > limite ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Valor alto</b>' + App.n(v) + ' votos é acima do esperado para uma seção (' + App.n(limite) + '). Confira se digitou certo.</div></div>' : '') +
       (jaEnviada ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Seção já enviada</b>Este envio vai para conferência junto com o anterior.</div></div>' : '') +
       '<div class="resumo-envio">' +
       '<div class="linha"><span>Local</span><b>' + h(local.nome) + '</b></div>' +

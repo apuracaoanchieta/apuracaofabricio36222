@@ -16,7 +16,7 @@ var Core = (function () {
   var SCHEMA = {
     CONFIG: ['chave', 'valor', 'descricao'],
     LOCAIS: ['id', 'municipio', 'nome', 'ativo'],
-    SECOES: ['id', 'local_id', 'numero', 'ativo'],
+    SECOES: ['id', 'local_id', 'numero', 'ativo', 'aptos'],
     LANCAMENTOS: ['id', 'client_id', 'recebido_em', 'origem', 'nome', 'telefone', 'municipio',
       'local_id', 'local', 'secao_id', 'secao', 'votos', 'votos_informados', 'foto_id',
       'status', 'validado_por', 'validado_em', 'obs'],
@@ -77,6 +77,21 @@ var Core = (function () {
     ['ESCOLA AGRÍCOLA DE OLIVÂNIA', [20, 74]],
     ['ESF JABAQUARA (UNIDADE DE SAÚDE)', [17, 18, 38]]
   ];
+
+  /* Eleitores aptos por seção — Anchieta, Zona 17 (2026). Usado só para completar seções sem esse dado. */
+  var APTOS_SEED = {
+    1: 189, 2: 187, 3: 327, 4: 328, 5: 183, 6: 345, 7: 329, 8: 327, 9: 189, 10: 341,
+    11: 237, 12: 238, 13: 296, 14: 239, 15: 181, 16: 151, 17: 223, 18: 229, 19: 260, 20: 201,
+    21: 212, 22: 171, 23: 217, 24: 180, 25: 285, 26: 278, 27: 229, 28: 211, 29: 218, 30: 199,
+    31: 205, 32: 188, 33: 346, 34: 188, 35: 346, 36: 282, 37: 212, 38: 228, 39: 189, 40: 341,
+    41: 293, 42: 282, 43: 239, 44: 227, 45: 236, 46: 225, 47: 191, 48: 227, 49: 282, 50: 216,
+    51: 221, 52: 245, 53: 291, 54: 224, 55: 279, 56: 189, 57: 345, 58: 247, 59: 243, 60: 341,
+    61: 246, 62: 236, 63: 225, 64: 278, 65: 318, 66: 332, 67: 273, 68: 344, 69: 319, 70: 266,
+    71: 288, 72: 148, 73: 210, 74: 150, 75: 105, 76: 160, 77: 276, 78: 133, 79: 332, 80: 323,
+    81: 245, 82: 250, 83: 332, 128: 260, 130: 208, 132: 295, 133: 225, 137: 347, 138: 332, 139: 193,
+    140: 344, 141: 282, 142: 322, 144: 44, 146: 280, 147: 318, 168: 149, 169: 322, 170: 331, 171: 10,
+    173: 18
+  };
 
   /* ------------------------------------------------------------------ */
   /* SHA-256 / HMAC em JavaScript puro (funciona no Apps Script e browser) */
@@ -196,8 +211,20 @@ var Core = (function () {
   }
   function mapSecoes(db) {
     return db.read('SECOES').map(function (r) {
-      return { id: str(r.id), local_id: str(r.local_id), numero: str(r.numero), ativo: bool(r.ativo), _row: r._row };
+      var ap = int(r.aptos);
+      return { id: str(r.id), local_id: str(r.local_id), numero: str(r.numero), ativo: bool(r.ativo), aptos: isNaN(ap) || ap < 0 ? 0 : ap, _row: r._row };
     });
+  }
+  function rowSec(s) { return { id: s.id, local_id: s.local_id, numero: s.numero, ativo: s.ativo ? 'TRUE' : 'FALSE', aptos: s.aptos ? String(s.aptos) : '' }; }
+  /* Preenche os eleitores aptos das seções de Anchieta que ainda estão sem esse dado */
+  function completarAptos(db) {
+    var anch = {};
+    mapLocais(db).forEach(function (l) { if (norm(l.municipio) === 'ANCHIETA') anch[l.id] = true; });
+    var n = 0;
+    mapSecoes(db).forEach(function (s) {
+      if (anch[s.local_id] && !s.aptos && APTOS_SEED[s.numero]) { s.aptos = APTOS_SEED[s.numero]; db.update('SECOES', s._row, rowSec(s)); n++; }
+    });
+    return n;
   }
   function mapLancamentos(db) {
     return db.read('LANCAMENTOS').map(function (r) {
@@ -461,7 +488,8 @@ var Core = (function () {
     var s = find(mapSecoes(db), function (x) { return x.local_id === localId && x.numero === num; });
     if (s) return s;
     s = { id: 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase(), local_id: localId, numero: num, ativo: true };
-    db.append('SECOES', { id: s.id, local_id: localId, numero: num, ativo: 'TRUE' });
+    s.aptos = 0;
+    db.append('SECOES', rowSec(s));
     return s;
   }
 
@@ -553,15 +581,20 @@ var Core = (function () {
       mapLocais(db).forEach(function (l) { if (norm(l.municipio) === norm(local.municipio)) locaisMun[l.id] = l; });
       var conflito = find(secoes, function (s) { return locaisMun[s.local_id] && s.numero === String(num) && s.id !== str(req.id); });
       if (conflito) throw erro('A seção ' + num + ' já está cadastrada em ' + locaisMun[conflito.local_id].nome + '.');
+      var aptos = null;
+      if (req.aptos !== undefined && req.aptos !== null) {
+        aptos = str(req.aptos) === '' ? 0 : int(req.aptos);
+        if (isNaN(aptos) || aptos < 0 || aptos > 99999) throw erro('Quantidade de eleitores aptos inválida.');
+      }
       if (req.id) {
         var s = find(secoes, function (x) { return x.id === str(req.id); });
         if (!s) throw erro('Seção não encontrada.');
-        db.update('SECOES', s._row, { id: s.id, local_id: local.id, numero: String(num), ativo: req.ativo === false ? 'FALSE' : 'TRUE' });
+        db.update('SECOES', s._row, rowSec({ id: s.id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos === null ? s.aptos : aptos }));
         log(db, u.usuario, 'EDITAR_SECAO', s.id + ' nº ' + num);
         return { id: s.id };
       }
       var id = 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
-      db.append('SECOES', { id: id, local_id: local.id, numero: String(num), ativo: req.ativo === false ? 'FALSE' : 'TRUE' });
+      db.append('SECOES', rowSec({ id: id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos || 0 }));
       log(db, u.usuario, 'CRIAR_SECAO', id + ' nº ' + num + ' em ' + local.nome);
       return { id: id };
     });
@@ -660,11 +693,11 @@ var Core = (function () {
         nv.secoes.forEach(function (n) {
           var s = secPorNum[n];
           localNovoDaSecao[n] = nv;
-          if (!s) db.append('SECOES', { id: 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase(), local_id: nv.id, numero: n, ativo: 'TRUE' });
-          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, { id: s.id, local_id: nv.id, numero: s.numero, ativo: 'TRUE' });
+          if (!s) db.append('SECOES', rowSec({ id: 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase(), local_id: nv.id, numero: n, ativo: true, aptos: 0 }));
+          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: nv.id, numero: s.numero, ativo: true, aptos: s.aptos }));
         });
       });
-      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, { id: s.id, local_id: s.local_id, numero: s.numero, ativo: 'FALSE' }); });
+      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: s.local_id, numero: s.numero, ativo: false, aptos: s.aptos })); });
       locais.forEach(function (l) { if (!usados[l.id] && l.ativo) db.update('LOCAIS', l._row, { id: l.id, municipio: l.municipio, nome: l.nome, ativo: 'FALSE' }); });
       // mantém os envios já registrados apontando para o local/nome certos
       var nomePorId = {}; novos.forEach(function (nv) { nomePorId[nv.id] = nv.nome; });
@@ -677,6 +710,7 @@ var Core = (function () {
           db.update('LANCAMENTOS', lc._row, rowLanc(lc));
         }
       });
+      completarAptos(db);
       log(db, u.usuario, 'SUBSTITUIR_LISTA', mun + ': ' + novos.length + ' locais, ' + plano.totalSecoes + ' seções; ' +
         plano.renomear.length + ' renomeados, ' + plano.criarSecao.length + ' seções novas, ' + plano.desativarSecao.length + ' seções desativadas');
       return { simulado: false, plano: plano, erros: [] };
@@ -705,6 +739,37 @@ var Core = (function () {
       });
       log(db, u.usuario, 'IMPORTAR', mun + ': ' + criadas + ' seções criadas');
       return { criadas: criadas, existentes: existentes, erros: erros };
+    });
+  };
+
+  /* Eleitores aptos em lote: uma linha por seção, "SEÇÃO;APTOS" (cabeçalhos são ignorados) */
+  ACOES['apuracao.importarAptos'] = function (db, req) {
+    var u = exigeApuracao(db, req);
+    var mun = norm(req.municipio);
+    if (!mun) throw erro('Informe o município.');
+    var valores = {}, erros = [], lidas = 0;
+    str(req.texto).split(/\r?\n/).forEach(function (linha, i) {
+      var partes = linha.trim().split(/\s*[;\t,]\s*|\s+/).filter(function (x) { return x !== ''; });
+      if (!partes.length) return;
+      var num = int(partes[0]), ap = int(partes[partes.length - 1]);
+      if (partes.length < 2 || isNaN(num) || isNaN(ap)) { if (lidas) erros.push('Linha ' + (i + 1) + ': use SEÇÃO;APTOS'); return; }
+      if (num <= 0 || ap < 0 || ap > 99999) { erros.push('Linha ' + (i + 1) + ': valor inválido'); return; }
+      lidas++; valores[String(num)] = ap;
+    });
+    if (!lidas) throw erro('Nenhuma linha válida. Use uma seção por linha: SEÇÃO;APTOS');
+    return db.lock(function () {
+      var ids = {};
+      mapLocais(db).forEach(function (l) { if (norm(l.municipio) === mun) ids[l.id] = true; });
+      var atualizadas = 0, iguais = 0, achadas = {};
+      mapSecoes(db).forEach(function (s) {
+        if (!ids[s.local_id] || !(s.numero in valores)) return;
+        achadas[s.numero] = true;
+        if (s.aptos === valores[s.numero]) { iguais++; return; }
+        s.aptos = valores[s.numero]; db.update('SECOES', s._row, rowSec(s)); atualizadas++;
+      });
+      var naoEncontradas = Object.keys(valores).filter(function (n) { return !achadas[n]; }).sort(function (a, b) { return a - b; });
+      log(db, u.usuario, 'IMPORTAR_APTOS', mun + ': ' + atualizadas + ' seções atualizadas');
+      return { atualizadas: atualizadas, iguais: iguais, naoEncontradas: naoEncontradas, erros: erros };
     });
   };
 
@@ -781,9 +846,10 @@ var Core = (function () {
       SEED.forEach(function (item, i) {
         var lid = 'L' + (i + 1 < 10 ? '0' : '') + (i + 1);
         db.append('LOCAIS', { id: lid, municipio: 'ANCHIETA', nome: item[0], ativo: 'TRUE' });
-        item[1].forEach(function (n) { db.append('SECOES', { id: 'S' + n, local_id: lid, numero: String(n), ativo: 'TRUE' }); });
+        item[1].forEach(function (n) { db.append('SECOES', rowSec({ id: 'S' + n, local_id: lid, numero: String(n), ativo: true, aptos: APTOS_SEED[n] || 0 })); });
       });
     }
+    completarAptos(db);
     var users = db.read('USUARIOS');
     [['apuracao', PERFIS.APURACAO, senhas.apuracao], ['partido', PERFIS.PARTIDO, senhas.partido]].forEach(function (x) {
       var ex = find(users, function (u) { return str(u.usuario).toLowerCase() === x[0]; });
@@ -812,7 +878,7 @@ var Core = (function () {
 
   return {
     SCHEMA: SCHEMA, STATUS: STATUS, PERFIS: PERFIS, SEED: SEED, CONFIG_PADRAO: CONFIG_PADRAO,
-    handle: handle, instalar: instalar, resolverUrnas: resolverUrnas,
+    handle: handle, instalar: instalar, resolverUrnas: resolverUrnas, completarAptos: completarAptos,
     sha256: sha256, hmac: hmac, norm: norm, int: int,
     ehTotal: function (l) { return /^TOT-/.test(String(l && l.secao_id || '')); }
   };

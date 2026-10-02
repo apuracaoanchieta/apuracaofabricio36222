@@ -58,7 +58,8 @@ var App = (function () {
       stamp: function () { return carimbo(); },
       lock: function (fn) { return fn(); }
     };
-    if (!salvo) { Core.instalar(db, { apuracao: 'apuracao', partido: 'partido' }); gerarExemplos(db, t); persistir(); }
+    if (!salvo) { Core.instalar(db, { apuracao: 'apuracao', partido: 'partido' }); gerarExemplos(db, t); props.APTOS_V1 = '1'; persistir(); }
+    else if (!props.APTOS_V1) { Core.completarAptos(db); props.APTOS_V1 = '1'; persistir(); }
     return db;
   }
   function gerarExemplos(db, t) {
@@ -71,6 +72,7 @@ var App = (function () {
       if (rnd() > 0.62) return;
       var quando = new Date(inicio + rnd() * 80 * 60000);
       var votos = Math.round(25 + rnd() * 120);
+      if (Number(s.aptos) > 0) votos = Math.min(votos, Math.round(Number(s.aptos) * (0.08 + rnd() * 0.3)));
       var validado = rnd() < 0.72;
       var nome = nomes[Math.floor(rnd() * nomes.length)];
       t.LANCAMENTOS.push({

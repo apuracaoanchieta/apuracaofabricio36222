@@ -98,6 +98,7 @@
     $('#t-sub').innerHTML = st.votosPen
       ? '+ <b>' + App.n(st.votosPen) + '</b> em conferência · total <b>' + App.n(st.votosVal + st.votosPen) + '</b>'
       : 'todos os votos recebidos já foram conferidos';
+    if (st.pctEleitores !== null) $('#t-sub').innerHTML += '<br><b>' + App.pct(st.votosSecComAptos, st.aptosApur) + '</b> dos eleitores das seções apuradas';
 
     // urnas
     var pctNum = st.totalUrnas ? st.apuradas / st.totalUrnas * 100 : 0;
@@ -105,7 +106,8 @@
     $('#t-bar-v').style.width = (st.totalUrnas ? st.urnasVal / st.totalUrnas * 100 : 0) + '%';
     $('#t-bar-p').style.width = (st.totalUrnas ? st.urnasPen / st.totalUrnas * 100 : 0) + '%';
     $('#t-urnas-txt').textContent = st.totalUrnas
-      ? st.apuradas + ' de ' + st.totalUrnas + ' urnas' + (st.urnasPen ? ' · ' + st.urnasPen + ' em conferência' : '') + (pctNum >= 100 ? ' · apuração completa' : '')
+      ? st.apuradas + ' de ' + st.totalUrnas + ' urnas' + (st.urnasPen ? ' · ' + st.urnasPen + ' em conferência' : '') + (pctNum >= 100 ? ' · apuração completa' : '') +
+        (st.aptosTotal ? ' · ' + App.pct(st.aptosApur, st.aptosTotal) + ' do eleitorado' : '')
       : (st.votosTotais ? 'total informado, sem urnas detalhadas' : 'nenhuma urna cadastrada');
 
     // ranking
@@ -117,7 +119,7 @@
       return '<li><div class="pos">' + (i + 1) + 'º</div><div class="nome" title="' + h(l.nome) + '">' + h(l.nome) + '</div>' +
         '<div class="val num">' + App.n(tot) + '</div>' +
         '<div class="mini"><i class="v" style="width:' + (l.votosVal / max * 100) + '%"></i><i class="p" style="width:' + (l.votosPen / max * 100) + '%"></i></div>' +
-        '<div class="urn">' + (l.total ? (l.val + l.pen) + '/' + l.total + ' urnas' : 'total informado') + '</div></li>';
+        '<div class="urn">' + (l.total ? (l.val + l.pen) + '/' + l.total + ' urnas' : 'total informado') + (l.aptosApur ? ' · ' + App.pct(l.votosSec, l.aptosApur) + ' dos aptos' : '') + '</div></li>';
     }).join('') : '<li class="t-vazio">Aguardando os primeiros boletins…</li>';
 
     // outros municípios

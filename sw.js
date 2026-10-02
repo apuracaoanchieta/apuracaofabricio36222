@@ -1,5 +1,5 @@
 /* Guarda as telas no celular para abrir mesmo sem internet */
-var VERSAO = 'apuracao-v7';
+var VERSAO = 'apuracao-v8';
 var ARQUIVOS = [
   './', 'index.html', 'fiscal.html', 'apuracao.html', 'partido.html', 'telao.html', 'relatorio.html', 'manifest.webmanifest',
   'assets/css/app.css', 'assets/css/telao.css', 'assets/css/relatorio.css', 'assets/js/config.js', 'assets/js/core.js', 'assets/js/common.js',

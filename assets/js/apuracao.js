@@ -148,15 +148,18 @@
   }
   function textoBusca(l) { return Core.norm([nomeLocal(l), 'secao ' + l.secao, l.secao, l.nome, l.telefone, l.municipio].join(' ')); }
   function corrigido(l) { return typeof l.votos_informados === 'number' && typeof l.votos === 'number' && l.votos !== l.votos_informados; }
+  function aptosSecao(id) { var x = dados.secoes.filter(function (s) { return s.id === id; })[0]; return x ? Number(x.aptos) || 0 : 0; }
   function selo(st) { return '<span class="selo selo-' + st + '">' + ROT_STATUS[st] + '</span>'; }
 
   /* ================= CONFERÊNCIA ================= */
   function cartaoConf(l, dentroDup) {
-    var corr = corrigido(l);
+    var corr = corrigido(l), ap = Core.ehTotal(l) ? 0 : aptosSecao(l.secao_id), acima = ap && l.votos > ap;
     return '<div class="conf' + (dupMap[l.secao_id] && !dentroDup ? ' dup' : '') + '" style="' + (l.status === 'VALIDADO' ? 'border-left-color:var(--validado)' : '') + '">' +
       '<div class="l1"><div><div class="local">' + h(nomeLocal(l)) + '</div><div class="secao">' + h(rotuloSecao(l)) +
       (l.municipio && Core.norm(l.municipio) !== Core.norm(dados.config.municipio_principal) ? ' · ' + h(l.municipio) : '') + '</div></div>' +
-      '<div class="votos num">' + App.n(l.votos) + '<small>VOTOS' + (corr ? ' (inf. ' + App.n(l.votos_informados) + ')' : '') + '</small></div></div>' +
+      '<div class="votos num' + (acima ? ' acima' : '') + '">' + App.n(l.votos) + '<small>VOTOS' + (corr ? ' (inf. ' + App.n(l.votos_informados) + ')' : '') + '</small>' +
+      (ap ? '<small style="opacity:.75">' + App.n(ap) + ' APTOS</small>' : '') + '</div></div>' +
+      (acima ? '<div class="aviso aviso-perigo small" style="margin:8px 0 0">' + ICON.alerta + '<div>Mais votos que eleitores aptos. Confira o BU.</div></div>' : '') +
       '<div class="fiscal"><span>' + h(l.nome || '—') + '</span>' +
       (l.telefone ? '<a href="' + App.whatsapp(l.telefone) + '" target="_blank" rel="noopener">' + App.tel(l.telefone) + '</a>' : '') +
       '<span>' + App.hora(l.recebido_em) + '</span>' + (dentroDup ? selo(l.status) : '') + '</div>' +
@@ -279,7 +282,8 @@
       '<div class="campo"><label for="cf-votos">Votos de ' + h(dados.config.candidato_nome || 'Fabricio Petri') + ' (confira com a foto)</label>' +
       '<div class="votos-box"><div class="cand"><b>' + h(dados.config.candidato_numero || '36.222') + '</b><span>' + (corr ? 'fiscal informou ' + App.n(l.votos_informados) : 'informado pelo fiscal') + '</span></div>' +
       '<input class="votos-input" id="cf-votos" inputmode="numeric" maxlength="8" value="' + (typeof l.votos === 'number' ? App.formatarVotos(l.votos) : '') + '" autocomplete="off"></div>' +
-      '<div class="ajuda">Se o número estiver diferente do BU, corrija antes de validar.</div></div>' +
+      '<div class="ajuda">Se o número estiver diferente do BU, corrija antes de validar.</div>' +
+      (aptosSecao(l.secao_id) && !Core.ehTotal(l) ? '<div class="aptos-info">Esta seção tem <b>' + App.n(aptosSecao(l.secao_id)) + '</b> eleitores aptos.</div><div id="cf-acima" class="aptos-alerta"></div>' : '') + '</div>' +
       '<div class="acoes" style="flex-direction:column">' +
       (l.status !== 'VALIDADO' ? '<button class="btn btn-ok btn-xl" id="cf-validar">' + ICON.check + 'Validar' + (temProx ? ' e ir para o próximo' : '') + '</button>' : '<button class="btn btn-ok btn-xl" id="cf-validar">' + ICON.check + 'Salvar votos</button>') +
       '<div style="display:flex;gap:10px">' +
@@ -289,6 +293,13 @@
     var m = App.modal(html, { classe: 'largo' });
     var inp = $('#cf-votos', m.el);
     App.campoVotos(inp);
+    var apL = Core.ehTotal(l) ? 0 : aptosSecao(l.secao_id);
+    function checarAptos() {
+      var box = $('#cf-acima', m.el); if (!box) return;
+      var v = App.valorVotos(inp.value);
+      box.innerHTML = apL && v > apL ? '<div class="aviso aviso-perigo small" style="margin:0">' + ICON.alerta + '<div><b>' + App.n(v) + ' votos é mais do que os ' + App.n(apL) + ' eleitores aptos.</b> Provável erro de digitação.</div></div>' : '';
+    }
+    inp.addEventListener('input', checarAptos); checarAptos();
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('#cf-validar', m.el).click(); } });
     if (window.innerWidth > 760) setTimeout(function () { inp.focus(); inp.select(); }, 80);
 
@@ -642,27 +653,34 @@
     var locs = dados.locais.filter(function (l) { return l.municipio === paramMun; }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
     var q = Core.norm(buscaLocal);
     var visiveis = locs.filter(function (l) { return !q || Core.norm(l.nome).indexOf(q) >= 0 || dados.secoes.some(function (s) { return s.local_id === l.id && s.numero === buscaLocal.trim(); }); });
-    var totSec = dados.secoes.filter(function (s) { return locs.some(function (l) { return l.id === s.local_id; }) && s.ativo; }).length;
+    var secsAtivas = dados.secoes.filter(function (s) { return locs.some(function (l) { return l.id === s.local_id; }) && s.ativo; });
+    var totSec = secsAtivas.length, totAptos = 0, semAptos = 0;
+    secsAtivas.forEach(function (s) { if (Number(s.aptos)) totAptos += Number(s.aptos); else semAptos++; });
     $('#par-conteudo').innerHTML =
       '<div class="barra-filtro"><select class="input" id="pl-mun">' + muns.map(function (m) { return '<option' + (m === paramMun ? ' selected' : '') + '>' + h(m) + '</option>'; }).join('') + '</select>' +
       '<input class="input" type="search" id="pl-busca" placeholder="Buscar local ou nº da seção" value="' + h(buscaLocal) + '" style="flex:1;min-width:180px">' +
       '<button class="btn btn-sec" id="pl-importar">' + ICON.upload + 'Importar lista</button>' +
+      '<button class="btn btn-sec" id="pl-aptos">' + ICON.upload + 'Eleitores aptos</button>' +
       '<button class="btn btn-azul" id="pl-novo">' + ICON.mais + 'Novo local</button></div>' +
-      '<p class="muted small" style="margin:-4px 0 14px">' + locs.length + ' locais · ' + totSec + ' seções ativas em ' + h(paramMun) + '. Toque em uma seção para editar.</p>' +
+      '<p class="muted small" style="margin:-4px 0 14px">' + locs.length + ' locais · ' + totSec + ' seções ativas' + (totAptos ? ' · ' + App.n(totAptos) + ' eleitores aptos' : '') + ' em ' + h(paramMun) + '. Toque em uma seção para editar.' +
+      (semAptos && totAptos ? ' <span style="color:#b34700;font-weight:700">' + semAptos + ' seç' + (semAptos === 1 ? 'ão' : 'ões') + ' sem eleitores aptos.</span>' : '') + '</p>' +
       (visiveis.length ? visiveis.map(function (l) {
         var secs = dados.secoes.filter(function (s) { return s.local_id === l.id; }).sort(function (a, b) { return Number(a.numero) - Number(b.numero); });
+        var apLocal = secs.reduce(function (a, s) { return a + (s.ativo ? Number(s.aptos) || 0 : 0); }, 0);
         return '<div class="local-item' + (l.ativo ? '' : ' inativo') + '"><div class="cab"><b>' + h(l.nome) + (l.ativo ? '' : ' <span class="selo selo-DESCARTADO">inativo</span>') + '</b>' +
-          '<span class="muted small">' + secs.length + ' seç' + (secs.length === 1 ? 'ão' : 'ões') + '</span>' +
+          '<span class="muted small">' + secs.length + ' seç' + (secs.length === 1 ? 'ão' : 'ões') + (apLocal ? ' · ' + App.n(apLocal) + ' eleitores' : '') + '</span>' +
           '<button class="btn btn-ghost btn-sm" data-edlocal="' + l.id + '">' + ICON.lapis + 'Editar</button>' +
           '<button class="btn btn-sec btn-sm" data-novasec="' + l.id + '">' + ICON.mais + 'Seção</button></div>' +
           '<div class="chips">' + (secs.length ? secs.map(function (s) {
-            return '<button class="chip' + (s.ativo ? '' : ' inativa') + '" data-edsec="' + s.id + '" title="Editar seção ' + h(s.numero) + '">' + h(s.numero) + '</button>';
+            return '<button class="chip' + (s.ativo ? '' : ' inativa') + '" data-edsec="' + s.id + '" title="Editar seção ' + h(s.numero) + (Number(s.aptos) ? ' · ' + s.aptos + ' eleitores aptos' : ' · sem eleitores aptos') + '">' + h(s.numero) +
+              '<small class="aptos">' + (Number(s.aptos) ? App.n(Number(s.aptos)) : '—') + '</small></button>';
           }).join('') : '<span class="muted small">Nenhuma seção. Toque em "+ Seção".</span>') + '</div></div>';
       }).join('') : '<div class="card vazio">Nenhum local encontrado.</div>');
     $('#pl-mun').onchange = function () { paramMun = this.value; parLocais(); };
     $('#pl-busca').oninput = function () { buscaLocal = this.value; var pos = this.selectionStart; parLocais(); var i = $('#pl-busca'); i.focus(); i.setSelectionRange(pos, pos); };
     $('#pl-novo').onclick = function () { modalLocal(null); };
     $('#pl-importar').onclick = modalImportar;
+    $('#pl-aptos').onclick = modalAptos;
     $$('[data-edlocal]').forEach(function (b) { b.onclick = function () { modalLocal(b.dataset.edlocal); }; });
     $$('[data-novasec]').forEach(function (b) { b.onclick = function () { modalSecao(null, b.dataset.novasec); }; });
     $$('[data-edsec]').forEach(function (b) { b.onclick = function () { var s = dados.secoes.filter(function (x) { return x.id === b.dataset.edsec; })[0]; modalSecao(s, s.local_id); }; });
@@ -700,6 +718,7 @@
     var locs = dados.locais.filter(function (x) { return x.municipio === local.municipio; }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
     var m = App.modal(App.cabecalhoModal(s ? 'Editar seção ' + s.numero : 'Nova seção', h(local.municipio)) +
       '<form id="ms-form"><div class="campo"><label for="ms-num">Número da seção</label><input class="input" id="ms-num" inputmode="numeric" value="' + (s ? h(s.numero) : '') + '" autofocus></div>' +
+      '<div class="campo"><label for="ms-aptos">Eleitores aptos <span class="muted">(opcional)</span></label><input class="input" id="ms-aptos" inputmode="numeric" maxlength="5" value="' + (s && Number(s.aptos) ? h(s.aptos) : '') + '" placeholder="Ex.: 285"></div>' +
       '<div class="campo"><label for="ms-local">Local de votação</label><select class="input" id="ms-local">' + locs.map(function (x) { return '<option value="' + x.id + '"' + (x.id === localId ? ' selected' : '') + '>' + h(x.nome) + '</option>'; }).join('') + '</select></div>' +
       '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px"><div><b>Seção ativa</b><span>Seções inativas não aparecem para os fiscais e não contam no total de urnas.</span></div><label class="switch"><input type="checkbox" id="ms-ativo"' + (!s || s.ativo ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<div class="acoes">' + (s ? '<button type="button" class="btn btn-perigo-sec" id="ms-excluir"' + (temEnvios ? ' disabled title="Tem envios: desative em vez de excluir"' : '') + '>' + ICON.lixo + 'Excluir</button>' : '') +
@@ -709,7 +728,7 @@
     function salvar(maisUma) {
       var b = $(maisUma ? '#ms-mais' : '#ms-salvar', m.el); App.carregando(b, true);
       var novoLocal = $('#ms-local', m.el).value;
-      return chamar('apuracao.salvarSecao', { id: s ? s.id : '', numero: $('#ms-num', m.el).value, local_id: novoLocal, ativo: $('#ms-ativo', m.el).checked }).then(function () {
+      return chamar('apuracao.salvarSecao', { id: s ? s.id : '', numero: $('#ms-num', m.el).value, local_id: novoLocal, ativo: $('#ms-ativo', m.el).checked, aptos: $('#ms-aptos', m.el).value.replace(/\D/g, '') }).then(function () {
         App.toast('Seção ' + $('#ms-num', m.el).value + ' salva.', 'ok'); m.fechar();
         return recarregarParametros().then(function () { if (maisUma) modalSecao(null, novoLocal); });
       }).catch(function (e) { App.toast(e.message, 'erro'); App.carregando(b, false); });
@@ -777,6 +796,30 @@
           if (r.erros.length) App.toast(r.erros.slice(0, 3).join(' | '), 'erro', 8000);
         }
         paramMun = $('#mi-mun', m.el).value.trim().toUpperCase(); m.fechar(); recarregarParametros();
+      }).catch(function (e) { App.toast(e.message, 'erro'); App.carregando(b, false); });
+    };
+  }
+
+  function modalAptos() {
+    var m = App.modal(App.cabecalhoModal('Eleitores aptos por seção', 'Atualiza a quantidade de eleitores aptos das seções já cadastradas.') +
+      '<div class="campo"><label for="ma-mun">Município</label><input class="input" id="ma-mun" value="' + h(paramMun) + '" list="ma-dl"><datalist id="ma-dl">' + municipiosConhecidos().map(function (x) { return '<option value="' + h(x) + '">'; }).join('') + '</datalist></div>' +
+      '<div class="campo"><label for="ma-txt">Uma seção por linha: SEÇÃO;APTOS</label><textarea class="input" id="ma-txt" rows="9" placeholder="31;205&#10;28;211&#10;29;218"></textarea>' +
+      '<div class="ajuda">Dica: copie as duas colunas da planilha (seção e quantidade de aptos) e cole aqui. A linha de título é ignorada.</div></div>' +
+      '<div id="ma-res"></div>' +
+      '<div class="acoes"><button class="btn btn-sec" data-fechar>Cancelar</button><button class="btn btn-azul" id="ma-ok">' + ICON.upload + 'Atualizar</button></div>', { classe: 'largo' });
+    $('#ma-ok', m.el).onclick = function () {
+      var b = this; App.carregando(b, true, 'Atualizando…');
+      chamar('apuracao.importarAptos', { municipio: $('#ma-mun', m.el).value, texto: $('#ma-txt', m.el).value }).then(function (r) {
+        App.toast(r.atualizadas + ' seç' + (r.atualizadas === 1 ? 'ão atualizada' : 'ões atualizadas') + (r.iguais ? ', ' + r.iguais + ' já estavam certas' : '') + '.', 'ok', 6000);
+        if (r.naoEncontradas.length || r.erros.length) {
+          App.carregando(b, false); b.innerHTML = 'Fechar'; b.onclick = function () { m.fechar(); };
+          $('#ma-res', m.el).innerHTML = '<div class="aviso aviso-alerta" style="display:block">' +
+            (r.naoEncontradas.length ? '<b>Seções não cadastradas neste município (ignoradas):</b> ' + r.naoEncontradas.map(h).join(', ') + '<br>' : '') +
+            (r.erros.length ? '<b>Linhas com problema:</b> ' + r.erros.slice(0, 10).map(h).join(' · ') : '') + '</div>';
+          recarregarParametros();
+          return;
+        }
+        paramMun = $('#ma-mun', m.el).value.trim().toUpperCase(); m.fechar(); recarregarParametros();
       }).catch(function (e) { App.toast(e.message, 'erro'); App.carregando(b, false); });
     };
   }

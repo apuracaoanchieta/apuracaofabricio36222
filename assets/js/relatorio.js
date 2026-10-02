@@ -64,7 +64,7 @@
     var cfg = dados.config;
     var r = Relat.consolidar(dadosFiltrados());
     var lista = opc.mun === '__TODOS__' ? r.municipios : r.municipios.filter(function (st) { return st.municipio === opc.mun; });
-    var tot = { votosVal: 0, votosPen: 0, apuradas: 0, totalUrnas: 0, urnasVal: 0, urnasPen: 0, votosTotais: 0 };
+    var tot = { votosVal: 0, votosPen: 0, apuradas: 0, totalUrnas: 0, urnasVal: 0, urnasPen: 0, votosTotais: 0, aptosTotal: 0, aptosApur: 0, votosSecComAptos: 0 };
     lista.forEach(function (st) { Object.keys(tot).forEach(function (k) { tot[k] += st[k] || 0; }); });
     var soConf = opc.status === 'confirmados';
     var completo = tot.totalUrnas && tot.apuradas >= tot.totalUrnas && !tot.urnasPen;
@@ -82,8 +82,11 @@
     html += '<section class="rel-kpis">' +
       '<div class="rel-kpi destaque"><span>Votos ' + (soConf ? 'confirmados' : 'apurados') + '</span><b>' + n(soConf ? tot.votosVal : tot.votosVal + tot.votosPen) + '</b>' +
       (!soConf && tot.votosPen ? '<em>' + n(tot.votosVal) + ' confirmados + ' + n(tot.votosPen) + ' em conferência</em>' : '<em>conferidos com a foto do BU</em>') + '</div>' +
-      '<div class="rel-kpi"><span>Urnas apuradas</span><b>' + (tot.totalUrnas ? tot.apuradas + ' / ' + tot.totalUrnas : '—') + '</b><em>' + (pct ? pct + ' do total' : 'sem urnas cadastradas') + '</em></div>' +
-      '<div class="rel-kpi"><span>Média por urna</span><b>' + (tot.apuradas ? n(Math.round((tot.votosVal + tot.votosPen - tot.votosTotais) / tot.apuradas)) : '—') + '</b><em>' + (tot.votosTotais ? 'sem contar totais informados' : 'votos por seção') + '</em></div>' +
+      '<div class="rel-kpi"><span>Urnas apuradas</span><b>' + (tot.totalUrnas ? tot.apuradas + ' / ' + tot.totalUrnas : '—') + '</b><em>' + (pct ? pct + ' do total' : 'sem urnas cadastradas') +
+        (tot.aptosTotal ? ' · ' + App.pct(tot.aptosApur, tot.aptosTotal) + ' dos ' + n(tot.aptosTotal) + ' eleitores' : '') + '</em></div>' +
+      (tot.aptosApur
+        ? '<div class="rel-kpi"><span>Votos / eleitores aptos</span><b>' + App.pct(tot.votosSecComAptos, tot.aptosApur) + '</b><em>nas seções apuradas · média de ' + n(Math.round((tot.votosVal + tot.votosPen - tot.votosTotais) / tot.apuradas)) + ' por urna</em></div>'
+        : '<div class="rel-kpi"><span>Média por urna</span><b>' + (tot.apuradas ? n(Math.round((tot.votosVal + tot.votosPen - tot.votosTotais) / tot.apuradas)) : '—') + '</b><em>' + (tot.votosTotais ? 'sem contar totais informados' : 'votos por seção') + '</em></div>') +
       '</section>';
     if (pendentes && !soConf) html += '<p class="rel-alerta">Atenção: ' + pendentes + ' envio(s) ainda em conferência. Os números podem mudar.</p>';
 
@@ -101,17 +104,18 @@
     // por local, para cada município
     lista.forEach(function (st) {
       if (!st.locais.length) return;
+      var comAp = st.aptosTotal > 0;
       html += '<h2>' + h(st.municipio) + ' — votos por local de votação</h2>' +
-        '<table class="rel-tab"><thead><tr><th class="c">#</th><th>Local de votação</th><th class="r">Urnas</th><th class="r">Confirmados</th>' + (soConf ? '' : '<th class="r">Em conferência</th>') + '<th class="r">Total</th><th class="r">% do município</th></tr></thead><tbody>';
+        '<table class="rel-tab"><thead><tr><th class="c">#</th><th>Local de votação</th><th class="r">Urnas</th><th class="r">Confirmados</th>' + (soConf ? '' : '<th class="r">Em conferência</th>') + '<th class="r">Total</th><th class="r">% do município</th>' + (comAp ? '<th class="r">% dos aptos</th>' : '') + '</tr></thead><tbody>';
       var totMun = st.votosVal + st.votosPen;
       st.locais.forEach(function (l, i) {
         var tl = l.votosVal + l.votosPen;
         html += '<tr><td class="c">' + (i + 1) + '</td><td>' + h(l.nome) + (l.totalInformado ? ' <small>(inclui total informado: ' + n(l.totalInformado) + ')</small>' : '') + '</td>' +
           '<td class="r">' + (l.total ? (l.val + l.pen) + '/' + l.total : '—') + '</td><td class="r">' + n(l.votosVal) + '</td>' + (soConf ? '' : '<td class="r">' + (l.votosPen ? n(l.votosPen) : '—') + '</td>') +
-          '<td class="r"><b>' + n(tl) + '</b></td><td class="r">' + (totMun ? App.pct(tl, totMun) : '—') + '</td></tr>';
+          '<td class="r"><b>' + n(tl) + '</b></td><td class="r">' + (totMun ? App.pct(tl, totMun) : '—') + '</td>' + (comAp ? '<td class="r">' + (l.aptosApur ? App.pct(l.votosSec, l.aptosApur) : '—') + '</td>' : '') + '</tr>';
       });
       html += '</tbody><tfoot><tr><td></td><td>Total ' + h(st.municipio) + '</td><td class="r">' + (st.totalUrnas ? st.apuradas + '/' + st.totalUrnas : '—') + '</td><td class="r">' + n(st.votosVal) + '</td>' +
-        (soConf ? '' : '<td class="r">' + n(st.votosPen) + '</td>') + '<td class="r">' + n(totMun) + '</td><td class="r">100%</td></tr></tfoot></table>';
+        (soConf ? '' : '<td class="r">' + n(st.votosPen) + '</td>') + '<td class="r">' + n(totMun) + '</td><td class="r">100%</td>' + (comAp ? '<td class="r">' + (st.aptosApur ? App.pct(st.votosSecComAptos, st.aptosApur) : '—') + '</td>' : '') + '</tr></tfoot></table>';
     });
 
     // detalhe por seção
@@ -124,7 +128,7 @@
           html += '<div class="rel-local"><h3>' + h(l.nome) + '<span>' + n(l.votosVal + l.votosPen) + ' votos</span></h3><table><tbody>' +
             l.secoes.map(function (s) {
               var u = s.urna, stt = u ? u.status : 'SEM';
-              return '<tr><td>Seção ' + h(s.numero) + (s.ativo ? '' : ' <small>(inativa)</small>') + '</td><td class="r">' + (u ? n(u.votos) : '—') + '</td><td class="c"><span class="mk ' + stt + '">' + (stt === 'VALIDADO' ? '✓' : stt === 'PENDENTE' ? '!' : '–') + '</span></td></tr>';
+              return '<tr><td>Seção ' + h(s.numero) + (s.ativo ? '' : ' <small>(inativa)</small>') + (s.aptos ? ' <small>' + n(s.aptos) + ' aptos</small>' : '') + '</td><td class="r">' + (u ? n(u.votos) : '—') + '</td><td class="c"><span class="mk ' + stt + '">' + (stt === 'VALIDADO' ? '✓' : stt === 'PENDENTE' ? '!' : '–') + '</span></td></tr>';
             }).join('') + (l.totalInformado ? '<tr><td>Total informado</td><td class="r">' + n(l.totalInformado) + '</td><td class="c"><span class="mk ' + (l.totalStatus || 'VALIDADO') + '">✓</span></td></tr>' : '') +
             '</tbody></table></div>';
         });
@@ -133,6 +137,7 @@
     }
 
     html += '<footer class="rel-rodape"><p>"Confirmado" = conferido pela equipe de apuração com a foto do boletim de urna. "Em conferência" = enviado pelo fiscal e ainda não conferido. ' +
+      '"% dos aptos" = votos do candidato ÷ eleitores aptos das seções já apuradas. ' +
       'Totais informados são resultados recebidos sem o detalhe por seção. Este é um levantamento interno da campanha; o resultado oficial é o divulgado pelo TSE/TRE-ES.</p>' +
       '<div class="rel-assin"><div>Responsável pela apuração</div><div>Data e hora</div></div>' +
       '<p class="rel-credito">Sistema de apuração desenvolvido por <b>DERYCK NOGUEIRA</b></p></footer>';
