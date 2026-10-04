@@ -214,7 +214,9 @@
       '<div><div class="rot-mini">' + h(nomeCand()) + ' · ' + h(dados.config.candidato_numero || '') + ' · ' + h(calc.grupoNosso.nome) + '</div>' + seloStatus(s, true) + '</div>' +
       '<p class="muted small" style="margin:0">' + textoStatus(st, s) + '</p></div></section>';
     if (st.kind === 'sem-dados') {
-      html += '<div class="aviso aviso-info">' + ICON.info + '<div><b>Sem votos por partido</b>Busque o resultado em <strong>Resultado TSE</strong> ou cadastre os votos dos partidos manualmente para calcular a projeção.</div></div>';
+      html += st.zerado
+        ? '<div class="aviso aviso-info">' + ICON.info + '<div><b>O TSE ainda não divulgou votos</b>O arquivo aplicado tem os partidos e candidatos, mas todos com 0 votos (é assim antes do fim da votação). A projeção de vagas e o <strong>Quanto falta para eleger</strong> aparecem aqui assim que você aplicar um resultado com votos.</div></div>'
+        : '<div class="aviso aviso-info">' + ICON.info + '<div><b>Sem votos por partido</b>Busque o resultado em <strong>Resultado TSE</strong> ou cadastre os votos dos partidos manualmente para calcular a projeção.</div></div>';
       html += htmlCandidatosPartido(st);
       el.innerHTML = html; ligarCandidatos(el); return;
     }
@@ -289,7 +291,7 @@
     return html + '</section>';
   }
   function textoStatus(st, s) {
-    if (s.chave === 'sem-dados') return 'Sem votos por partido para projetar as vagas.';
+    if (s.chave === 'sem-dados') return st.zerado ? 'O TSE ainda não divulgou votos. A projeção começa com o primeiro resultado com votos.' : 'Sem votos por partido para projetar as vagas.';
     if (s.chave === 'sem-candidato') return 'O número ' + h(calc.meuNumero) + ' não está na lista de candidatos do ' + h(calc.grupoNosso.nome) + '. Carregue os candidatos abaixo ou busque no TSE.';
     if (s.chave === 'eleito') return 'Com os números atuais, o ' + h(calc.grupoNosso.nome) + ' faz ' + st.vagasDoPartido + ' vaga(s) e ' + h(nomeCand()) + ' está entre os eleitos do partido.';
     if (s.chave === 'fora-faixa') return 'Passa da cláusula de desempenho, mas não está entre os ' + st.vagasDoPartido + ' mais votados do ' + h(calc.grupoNosso.nome) + '.';
@@ -362,7 +364,8 @@
   function renderEleitos() {
     var el = $('#sec-eleitos'), e = Tse.eleitosProjetados(calc), st = calc.st;
     if (st.kind !== 'com-dados') {
-      el.innerHTML = '<div class="aviso aviso-info">' + ICON.info + '<div><b>Sem votos por partido</b>Busque e aplique o resultado em <strong>Resultado TSE</strong> para ver os eleitos projetados.</div></div>';
+      el.innerHTML = '<div class="aviso aviso-info">' + ICON.info + '<div><b>' + (st.zerado ? 'O TSE ainda não divulgou votos' : 'Sem votos por partido') + '</b>' +
+        (st.zerado ? 'Os eleitos projetados aparecem assim que você aplicar um resultado com votos.' : 'Busque e aplique o resultado em <strong>Resultado TSE</strong> para ver os eleitos projetados.') + '</div></div>';
       return;
     }
     var temOficial = calc.candidatos.some(function (c) { return Tse.situacaoOficial(c.situacao); });

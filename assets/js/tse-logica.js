@@ -140,7 +140,8 @@ var Tse = (function () {
         votos: Number(c.votos) || 0, ehNosso: !!meuNumero && digits(c.numero) === meuNumero, chave: grupoDe(c.partido).chave };
     });
     var doPartido = candidatos.filter(function (c) { return c.chave === grupoNosso.chave; });
-    var st = statusCandidato(votosValidos, vagas, grupoNosso.chave, oficial, doPartido);
+    // antes da apuração o TSE publica tudo zerado: sem votos, não há projeção (evita "abaixo da cláusula" com 0 votos)
+    var st = votosValidos > 0 ? statusCandidato(votosValidos, vagas, grupoNosso.chave, oficial, doPartido) : { kind: 'sem-dados', zerado: oficial.length > 0 };
     return { cfg: cfg, vagas: vagas, meuNumero: meuNumero, grupoNosso: grupoNosso, oficial: oficial, votosValidos: votosValidos,
       candidatos: candidatos, doPartido: doPartido, st: st, status: classificarStatus(st) };
   }
