@@ -9,6 +9,19 @@
   $('#btn-sair').innerHTML = ICON.sair;
   $('#btn-telao').innerHTML = ICON.tv + 'Abrir modo telão (TV)';
   $('#btn-tse').innerHTML = ICON.grafico + 'Resultado oficial do TSE (estado)';
+  var tseLiberado = false;
+  function ajustarBotaoTse(liberado) {
+    tseLiberado = liberado;
+    var b = $('#btn-tse');
+    b.classList.toggle('desabilitado', !liberado);
+    b.setAttribute('aria-disabled', liberado ? 'false' : 'true');
+    b.title = liberado ? 'Abrir o resultado oficial do TSE' : 'Aguardando liberação da equipe de apuração';
+    b.innerHTML = ICON.grafico + 'Resultado oficial do TSE (estado)' + (liberado ? '' : '<small class="btn-sub">aguardando liberação</small>');
+  }
+  ajustarBotaoTse(false);
+  $('#btn-tse').addEventListener('click', function (e) {
+    if (!tseLiberado) { e.preventDefault(); App.toast('O Resultado oficial do TSE ainda não foi liberado pela equipe de apuração.', 'erro', 4000); }
+  });
   $('#l-ver').innerHTML = ICON.olho;
 
   function telaLogin() {
@@ -42,7 +55,7 @@
     ocupado = true;
     App.api('partido.dados', { token: sess.token }).then(function (r) {
       painel.atualizar(r);
-      $('#btn-tse').hidden = String(r.config.tse_partido_visivel).toUpperCase() !== 'TRUE';
+      ajustarBotaoTse(String(r.config.tse_partido_visivel).toUpperCase() === 'TRUE');
       $('#t-titulo').textContent = (r.config.candidato_nome || 'Fabricio Petri') + ' ' + (r.config.candidato_numero || '');
       var at = $('#t-atualizado'); at.classList.remove('off'); at.lastChild.textContent = App.hora(r.agora) + r.agora.substr(16, 3);
     }).catch(function (e) {

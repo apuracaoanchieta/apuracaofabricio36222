@@ -715,3 +715,11 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
 .tse-bloqueio { padding: 40px 24px; max-width: 640px; margin: 20px auto; }
 .tse-bloqueio .sucesso-icone { background: var(--neutro-bg); color: var(--texto-2); }
 .tse-bloqueio p { margin: 8px auto 18px; max-width: 460px; }
+/* botão "Resultado oficial do TSE" enquanto não liberado */
+.btn.desabilitado { opacity: .45; filter: grayscale(.7); box-shadow: none; cursor: not-allowed; }
+.btn.desabilitado:hover { transform: none; }
+.btn .btn-sub { display: block; font-size: 11.5px; font-weight: 600; opacity: .9; margin-left: 6px; text-transform: none; }
+@media (max-width: 640px) {
+  .btn-telao-destaque { white-space: normal; flex-wrap: wrap; text-align: center; }
+  .btn-telao-destaque .btn-sub { flex-basis: 100%; margin: 2px 0 0; }
+}
