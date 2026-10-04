@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Relatório final — Fabricio Petri 36.222</title>
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/relatorio.css">
+</head>
+<body class="pg-relatorio">
+  <div id="tela-login" class="login-pg" hidden>
+    <header class="hero">
+      <a class="voltar" href="./" aria-label="Voltar ao início"><span data-voltar></span>Início</a>
+      <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+      <p class="sub">Relatório final</p>
+    </header>
+    <form class="card login-card" id="form-login">
+      <h1>Digite a senha</h1>
+      <p class="muted small" style="margin:0 0 18px">Senha da Apuração.</p>
+      <div class="campo"><label for="l-senha">Senha de acesso</label>
+        <input class="input" id="l-senha" type="password" autocomplete="current-password" required></div>
+      <div id="l-demo" class="aviso aviso-info small" hidden></div>
+      <button class="btn btn-primario btn-xl" type="submit" id="l-entrar">Abrir relatório final</button>
+    </form>
+  </div>
+
+  <div id="tela-rel" hidden>
+    <div class="rel-barra no-print">
+      <div class="rel-barra-in">
+        <a class="btn btn-sec" href="tse.html" id="r-voltar">← Voltar</a>
+        <div class="filtro"><label for="r-conteudo">Conteúdo</label><select class="input" id="r-conteudo">
+          <option value="completo">Completo (com os eleitos de todos os partidos)</option>
+          <option value="resumo">Resumo (candidato, partido e Anchieta)</option>
+        </select></div>
+        <button class="btn btn-sec" type="button" id="r-atualizar">Atualizar dados</button>
+        <button class="btn btn-primario" type="button" id="r-imprimir">Imprimir / Salvar PDF</button>
+      </div>
+      <p class="rel-dica">Para gerar o PDF: clique em <b>Imprimir / Salvar PDF</b> e escolha <b>"Salvar como PDF"</b> no destino da impressão.</p>
+    </div>
+    <article class="rel-folha" id="rel"></article>
+  </div>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/candidatos-tse-es2026.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/tse-logica.js"></script>
+  <script src="assets/js/relatorio-final.js"></script>
+</body>
+</html>

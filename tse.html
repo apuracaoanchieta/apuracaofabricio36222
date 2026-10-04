@@ -48,11 +48,13 @@
         <button class="aba" data-aba="eleitos" role="tab">Eleitos</button>
         <button class="aba" data-aba="aptos" role="tab">Candidatos aptos</button>
         <button class="aba" data-aba="graficos" role="tab">Gráficos</button>
+        <button class="aba" data-aba="conferencia" role="tab">Conferência</button>
         <button class="aba" data-aba="historico" role="tab">Histórico</button>
       </div>
     </nav>
     <main class="wrap-l">
       <div class="acoes-painel">
+        <a class="btn btn-sec btn-sm" href="relatorio-final.html" id="btn-rel-final" title="Relatório final para imprimir ou salvar em PDF"></a>
         <a class="btn btn-primario btn-sm" href="telao-tse.html" id="btn-telao-tse" title="Abrir o telão da Apuração TSE"></a>
       </div>
       <section data-painel="resultado" id="sec-resultado"></section>
@@ -60,6 +62,7 @@
       <section data-painel="eleitos" id="sec-eleitos" hidden></section>
       <section data-painel="aptos" id="sec-aptos" hidden></section>
       <section data-painel="graficos" id="sec-graficos" hidden></section>
+      <section data-painel="conferencia" id="sec-conferencia" hidden></section>
       <section data-painel="historico" id="sec-historico" hidden></section>
     </main>
   </div>
@@ -71,6 +74,7 @@
   <script src="assets/js/tse-demo.js"></script>
   <script src="assets/js/common.js"></script>
   <script src="assets/js/tse-logica.js"></script>
+  <script src="assets/js/tse-aviso.js"></script>
   <script src="assets/js/tse.js"></script>
 </body>
 </html>

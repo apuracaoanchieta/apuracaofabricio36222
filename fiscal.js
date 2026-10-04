@@ -1,0 +1,389 @@
+/* Área do FISCAL: preenche e envia o BU (funciona mesmo sem internet) */
+(function () {
+  'use strict';
+  var $ = App.$, h = App.h, ICON = App.ICON;
+  var K_IDENT = 'fp_fiscal_ident', K_PARAMS = 'fp_params', K_FILA = 'fp_fila', K_HIST = 'fp_historico', K_ULT_LOCAL = 'fp_ultimo_local';
+
+  var params = App.lsGet(K_PARAMS, null);
+  var foto = null;
+  var enviando = false;
+
+  App.bannerDemo('Para usar de verdade, configure a planilha (veja o guia).');
+  $('#foto-vazia .icone').innerHTML = ICON.camera;
+  $('.ic-cam').outerHTML = ICON.camera;
+  $('.ic-gal').outerHTML = ICON.galeria;
+  $('#fechado .sucesso-icone').innerHTML = ICON.relogio;
+
+  /* ---------------- Identificação do fiscal ---------------- */
+  function mascaraTel(v) {
+    var d = v.replace(/\D/g, '').slice(0, 11);
+    if (d.length > 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+    if (d.length > 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+    if (d.length > 2) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
+    return d.length ? '(' + d : '';
+  }
+  $('#f-tel').addEventListener('input', function () { this.value = mascaraTel(this.value); this.classList.remove('erro'); });
+  $('#f-nome').addEventListener('input', function () { this.classList.remove('erro'); });
+
+  function mostrarIdent() {
+    var id = App.lsGet(K_IDENT, null);
+    if (id && id.nome && id.telefone) {
+      $('#f-nome').value = id.nome; $('#f-tel').value = mascaraTel(id.telefone);
+      $('#ident-nome').textContent = id.nome;
+      $('#ident-tel').textContent = App.tel(id.telefone);
+      $('#ident-avatar').textContent = App.iniciais(id.nome);
+      $('#ident-resumo').hidden = false; $('#ident-campos').hidden = true;
+    } else {
+      $('#ident-resumo').hidden = true; $('#ident-campos').hidden = false;
+    }
+  }
+  $('#btn-alterar-ident').addEventListener('click', function () {
+    $('#ident-resumo').hidden = true; $('#ident-campos').hidden = false; $('#f-nome').focus();
+  });
+
+  /* ---------------- Locais e seções ---------------- */
+  function carregarParams(silencioso) {
+    return App.api('public.params').then(function (r) {
+      params = { config: r.config, locais: r.locais, secoes: r.secoes, recebidas: r.recebidas, em: Date.now() };
+      App.lsSet(K_PARAMS, params);
+      montarParams();
+    }).catch(function (e) {
+      if (params) { montarParams(); if (!silencioso) avisoConexao(); }
+      else {
+        $('#f-local-busca').placeholder = 'Sem conexão — não foi possível carregar';
+        avisoConexao(true);
+      }
+      if (e.servidor) App.toast(e.message, 'erro');
+    });
+  }
+  function avisoConexao(semDados) {
+    var el = $('#aviso-conexao');
+    el.hidden = false;
+    el.innerHTML = ICON.offline + '<div><b>' + (semDados ? 'Sem conexão' : 'Você está sem internet') + '</b>' +
+      (semDados ? 'Conecte-se uma vez para carregar a lista de locais.' : 'Pode preencher normalmente: o envio fica guardado e sai sozinho quando a internet voltar.') +
+      '</div><button class="btn btn-sec btn-sm acao" type="button" id="btn-tentar-params">Tentar</button>';
+    $('#btn-tentar-params').onclick = function () { el.hidden = true; carregarParams(); };
+  }
+
+  function montarParams() {
+    var cfg = params.config || {};
+    $('#cand-nome').textContent = cfg.candidato_nome || 'Fabricio Petri';
+    $('#cand-num').textContent = (cfg.candidato_numero || '36.222') + ' · ' + (cfg.cargo || 'Deputado Estadual');
+    var fechado = String(cfg.recebimento_aberto).toUpperCase() === 'FALSE';
+    $('#fechado').hidden = !fechado;
+    $('#form-bu').hidden = fechado;
+    var sel = $('#f-local'), atual = sel.value || App.lsGet(K_ULT_LOCAL, '');
+    sel.innerHTML = '<option value=""></option>' + params.locais.map(function (l) {
+      return '<option value="' + h(l.id) + '">' + h(l.nome) + '</option>';
+    }).join('');
+    if (atual && params.locais.some(function (l) { return l.id === atual; })) sel.value = atual;
+    Combo.atualizar();
+    montarSecoes();
+  }
+
+  /* ---------------- Busca do local de votação ---------------- */
+  var Combo = (function () {
+    var inp = $('#f-local-busca'), lista = $('#combo-lista'), limpar = $('#combo-limpar'), sel = $('#f-local');
+    var itens = [], ativo = -1;
+    function nomeAtual() {
+      var l = params && params.locais.filter(function (x) { return x.id === sel.value; })[0];
+      return l ? l.nome : '';
+    }
+    function marcar(txt, q) {
+      if (!q) return h(txt);
+      var n = Core.norm(txt), i = n.indexOf(q);
+      if (i < 0) return h(txt);
+      return h(txt.slice(0, i)) + '<mark>' + h(txt.slice(i, i + q.length)) + '</mark>' + h(txt.slice(i + q.length));
+    }
+    function abrir() {
+      if (!params) return;
+      var txt = inp.value.trim(), q = txt === nomeAtual() ? '' : Core.norm(txt);
+      var palavras = q.split(' ').filter(Boolean);
+      itens = params.locais.filter(function (l) {
+        var n = Core.norm(l.nome);
+        return palavras.every(function (p) { return n.indexOf(p) >= 0; });
+      });
+      ativo = itens.length ? 0 : -1;
+      lista.innerHTML = itens.length ? itens.map(function (l, i) {
+        var qtd = params.secoes.filter(function (s) { return s.local_id === l.id; }).length;
+        return '<li role="option" id="op-' + i + '" data-i="' + i + '" class="' + (i === ativo ? 'ativo' : '') + (l.id === sel.value ? ' escolhido' : '') + '">' +
+          '<span>' + marcar(l.nome, palavras.length === 1 ? palavras[0] : '') + '</span><small>' + qtd + ' seç' + (qtd === 1 ? 'ão' : 'ões') + '</small></li>';
+      }).join('') : '<li class="combo-vazio">Nenhum local encontrado com "' + h(txt) + '"</li>';
+      lista.hidden = false;
+      inp.setAttribute('aria-expanded', 'true');
+    }
+    function fechar() { lista.hidden = true; inp.setAttribute('aria-expanded', 'false'); }
+    function escolher(l) {
+      sel.value = l ? l.id : '';
+      inp.value = l ? l.nome : '';
+      inp.classList.remove('erro');
+      limpar.hidden = !inp.value;
+      fechar();
+      sel.dispatchEvent(new Event('change'));
+    }
+    function moverAtivo(d) {
+      if (!itens.length) return;
+      ativo = (ativo + d + itens.length) % itens.length;
+      App.$$('li[data-i]', lista).forEach(function (li) { li.classList.toggle('ativo', Number(li.dataset.i) === ativo); });
+      var li = $('#op-' + ativo); if (li) li.scrollIntoView({ block: 'nearest' });
+    }
+    inp.addEventListener('focus', function () { inp.select(); abrir(); });
+    inp.addEventListener('input', function () { limpar.hidden = !inp.value; abrir(); });
+    inp.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (lista.hidden) abrir(); else moverAtivo(1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); moverAtivo(-1); }
+      else if (e.key === 'Enter') { if (!lista.hidden && itens[ativo]) { e.preventDefault(); escolher(itens[ativo]); $('#f-secao').focus(); } }
+      else if (e.key === 'Escape') { fechar(); }
+    });
+    lista.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    lista.addEventListener('click', function (e) {
+      var li = e.target.closest('li[data-i]');
+      if (li) escolher(itens[Number(li.dataset.i)]);
+    });
+    inp.addEventListener('blur', function () {
+      setTimeout(function () {
+        if (!lista.hidden) fechar();
+        var txt = inp.value.trim();
+        if (!txt) { if (sel.value) escolher(null); return; }
+        if (txt === nomeAtual()) return;
+        // digitou e saiu: se só um local combina, escolhe; senão volta ao local escolhido
+        var q = Core.norm(txt);
+        var bate = params ? params.locais.filter(function (l) { return Core.norm(l.nome).indexOf(q) >= 0; }) : [];
+        if (bate.length === 1) escolher(bate[0]); else { inp.value = nomeAtual(); limpar.hidden = !inp.value; }
+      }, 120);
+    });
+    limpar.addEventListener('click', function () { escolher(null); inp.focus(); });
+    return {
+      atualizar: function () {
+        inp.disabled = !params;
+        inp.placeholder = 'Digite para buscar o local';
+        if (document.activeElement !== inp) inp.value = nomeAtual();
+        limpar.hidden = !inp.value;
+      }
+    };
+  })();
+
+  function recebidasSet() {
+    var s = {};
+    (params && params.recebidas || []).forEach(function (id) { s[id] = true; });
+    App.lsGet(K_HIST, []).forEach(function (x) { if (x.status !== 'ERRO') s[x.secao_id] = true; });
+    return s;
+  }
+  function montarSecoes() {
+    var lid = $('#f-local').value, sel = $('#f-secao'), atual = sel.value;
+    if (!lid || !params) { sel.disabled = true; sel.innerHTML = '<option value="">Escolha primeiro o local</option>'; return; }
+    var rec = recebidasSet();
+    var lista = params.secoes.filter(function (s) { return s.local_id === lid; });
+    sel.disabled = false;
+    sel.innerHTML = '<option value="">Escolha a seção</option>' + lista.map(function (s) {
+      return '<option value="' + h(s.id) + '">Seção ' + h(s.numero) + (rec[s.id] ? ' — já enviada' : '') + '</option>';
+    }).join('');
+    if (atual && lista.some(function (s) { return s.id === atual; })) sel.value = atual;
+    else if (lista.length === 1) sel.value = lista[0].id;
+    ajudaSecao();
+  }
+  function ajudaSecao() {
+    var id = $('#f-secao').value, aj = $('#ajuda-secao');
+    if (id && recebidasSet()[id]) {
+      aj.hidden = false;
+      aj.innerHTML = '<span style="color:#b35c00;font-weight:700">Esta seção já foi enviada.</span> Só envie de novo se precisar corrigir — a apuração vai conferir.';
+    } else aj.hidden = true;
+  }
+  $('#f-local').addEventListener('change', function () {
+    this.classList.remove('erro'); App.lsSet(K_ULT_LOCAL, this.value); $('#f-secao').value = ''; montarSecoes();
+  });
+  $('#f-secao').addEventListener('change', function () { this.classList.remove('erro'); ajudaSecao(); });
+  App.campoVotos($('#f-votos'), function () { $('#f-votos').closest('.votos-box').style.borderColor = ''; });
+
+  /* ---------------- Foto ---------------- */
+  function aoEscolherFoto(e) {
+    var arq = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!arq) return;
+    var area = $('#foto-area');
+    area.classList.remove('erro');
+    $('#foto-vazia').hidden = true; $('#foto-cheia').hidden = false;
+    $('#foto-preview').removeAttribute('src');
+    $('#foto-preview').alt = 'Processando foto…';
+    App.comprimirFoto(arq).then(function (d) {
+      foto = d; $('#foto-preview').src = d; $('#foto-preview').alt = 'Prévia da foto do boletim';
+      area.classList.add('tem-foto');
+    }).catch(function (err) {
+      foto = null; $('#foto-vazia').hidden = false; $('#foto-cheia').hidden = true; App.toast(err.message, 'erro');
+    });
+  }
+  $('#f-foto-camera').addEventListener('change', aoEscolherFoto);
+  $('#f-foto-galeria').addEventListener('change', aoEscolherFoto);
+  function limparFoto() {
+    foto = null; $('#foto-vazia').hidden = false; $('#foto-cheia').hidden = true;
+    $('#foto-area').classList.remove('tem-foto', 'erro');
+  }
+
+  /* ---------------- Revisão ---------------- */
+  $('#form-bu').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!params) return App.toast('Aguarde carregar a lista de locais.', 'erro');
+    var nome = $('#f-nome').value.trim().replace(/\s+/g, ' ');
+    var telefone = $('#f-tel').value.replace(/\D/g, '');
+    var localId = $('#f-local').value, secaoId = $('#f-secao').value, votos = $('#f-votos').value;
+    var cfg = params.config || {};
+    var erros = [];
+    if (nome.length < 3) { erros.push('Informe seu nome.'); $('#f-nome').classList.add('erro'); }
+    if (telefone.length < 10) { erros.push('Informe o telefone com DDD.'); $('#f-tel').classList.add('erro'); }
+    if (erros.length && $('#ident-campos').hidden) { $('#ident-resumo').hidden = true; $('#ident-campos').hidden = false; }
+    if (!localId) { erros.push('Escolha o local de votação.'); $('#f-local-busca').classList.add('erro'); }
+    if (!secaoId) { erros.push('Escolha a seção.'); $('#f-secao').classList.add('erro'); }
+    if (votos === '') { erros.push('Digite a quantidade de votos.'); $('.votos-box').style.borderColor = 'var(--perigo)'; }
+    if (!foto && String(cfg.foto_obrigatoria).toUpperCase() !== 'FALSE') { erros.push('Tire a foto do boletim de urna.'); $('#foto-area').classList.add('erro'); }
+    if (erros.length) {
+      App.toast(erros[0], 'erro');
+      var primeiro = $('.erro', this) || $('#foto-area.erro');
+      if (primeiro) primeiro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    App.lsSet(K_IDENT, { nome: nome, telefone: telefone });
+    var local = params.locais.filter(function (l) { return l.id === localId; })[0];
+    var secao = params.secoes.filter(function (s) { return s.id === secaoId; })[0];
+    var v = App.valorVotos(votos);
+    var limite = parseInt(String(cfg.alerta_votos_max).replace(/\D/g, ''), 10) || 400;
+    var alertaAtivo = String(cfg.alerta_votos_ativo).toUpperCase() === 'TRUE';
+    var jaEnviada = recebidasSet()[secaoId];
+
+    var m = App.modal(App.cabecalhoModal('Confira antes de enviar', 'Compare cada dado com o boletim impresso.') +
+      (Number(secao.aptos) > 0 && v > Number(secao.aptos) ? '<div class="aviso aviso-perigo">' + ICON.alerta + '<div><b>Mais votos que eleitores</b>A seção ' + h(secao.numero) + ' tem só ' + App.n(Number(secao.aptos)) + ' eleitores aptos e você digitou ' + App.n(v) + ' votos. Confira o número no boletim.</div></div>' :
+      alertaAtivo && v > limite ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Valor alto</b>' + App.n(v) + ' votos é acima do esperado para uma seção (' + App.n(limite) + '). Confira se digitou certo.</div></div>' : '') +
+      (jaEnviada ? '<div class="aviso aviso-alerta">' + ICON.alerta + '<div><b>Seção já enviada</b>Este envio vai para conferência junto com o anterior.</div></div>' : '') +
+      '<div class="resumo-envio">' +
+      '<div class="linha"><span>Local</span><b>' + h(local.nome) + '</b></div>' +
+      '<div class="linha"><span>Seção</span><b>' + h(secao.numero) + '</b></div>' +
+      '<div class="linha destaque"><span>Votos de ' + h(cfg.candidato_nome || 'Fabricio Petri') + '</span><b class="num">' + App.n(v) + '</b></div>' +
+      (foto ? '<img src="' + foto + '" alt="Foto do BU">' : '') +
+      '</div>' +
+      '<div class="acoes"><button class="btn btn-sec" data-fechar>Corrigir</button>' +
+      '<button class="btn btn-primario" id="btn-confirmar">' + ICON.upload + 'Confirmar envio</button></div>');
+    $('#btn-confirmar', m.el).addEventListener('click', function () {
+      m.fechar();
+      registrarEnvio({ nome: nome, telefone: telefone, local: local, secao: secao, votos: v });
+    });
+  });
+
+  /* ---------------- Fila de envio (offline) ---------------- */
+  function registrarEnvio(d) {
+    var clientId = App.uuid();
+    var item = {
+      client_id: clientId, criado: Date.now(),
+      payload: { client_id: clientId, nome: d.nome, telefone: d.telefone, local_id: d.local.id, secao_id: d.secao.id, votos: d.votos, foto: foto }
+    };
+    var fila = App.lsGet(K_FILA, []);
+    fila.push(item);
+    var guardou = App.lsSet(K_FILA, fila);
+    var hist = App.lsGet(K_HIST, []);
+    hist.unshift({ client_id: clientId, local: d.local.nome, secao: d.secao.numero, secao_id: d.secao.id, votos: d.votos, quando: App.carimbo(), status: 'AGUARDANDO' });
+    App.lsSet(K_HIST, hist.slice(0, 60));
+    if (!guardou) App.toast('Memória do celular cheia: mantenha esta tela aberta até enviar.', 'erro', 6000);
+
+    // limpa o formulário para a próxima seção (mantém o local)
+    $('#f-secao').value = ''; $('#f-votos').value = ''; limparFoto();
+    montarSecoes(); renderHistorico();
+
+    var m = App.modal('<div class="centro" id="res-envio"><div class="sucesso-icone espera">' + '<span class="spin" style="width:34px;height:34px;border-width:4px;border-color:rgba(160,115,0,.25);border-top-color:#a07300"></span>' +
+      '</div><h2>Enviando…</h2><p class="muted">Seção ' + h(d.secao.numero) + ' · ' + App.n(d.votos) + ' votos</p></div>', { fecharFora: false });
+    processarFila().then(function (res) {
+      var r = res[clientId];
+      var box = $('#res-envio', m.el);
+      if (!box) return;
+      if (r && r.ok) {
+        box.innerHTML = '<div class="sucesso-icone">' + ICON.check + '</div><h2>Boletim enviado!</h2>' +
+          '<p class="muted">Seção ' + h(d.secao.numero) + ' · <b>' + App.n(d.votos) + ' votos</b> recebidos pela apuração.' +
+          (r.duplicada ? '<br><span style="color:#b35c00;font-weight:700">Esta seção já tinha um envio; a apuração vai conferir.</span>' : '') + '</p>';
+      } else if (r && r.erro) {
+        box.innerHTML = '<div class="sucesso-icone" style="background:var(--perigo-bg);color:var(--perigo)">' + ICON.x + '</div><h2>Envio recusado</h2>' +
+          '<p class="muted">' + h(r.erro) + '</p>';
+      } else {
+        box.innerHTML = '<div class="sucesso-icone espera">' + ICON.nuvem + '</div><h2>Guardado no celular</h2>' +
+          '<p class="muted">Sem internet agora. O boletim fica salvo e será enviado <b>automaticamente</b> quando a conexão voltar. Não apague os dados do navegador.</p>';
+      }
+      box.insertAdjacentHTML('beforeend', '<div class="acoes"><button class="btn btn-primario btn-xl" data-fechar>Enviar outra seção</button></div>');
+      App.$$('[data-fechar]', box).forEach(function (b) { b.onclick = function () { m.fechar(); window.scrollTo({ top: 0, behavior: 'smooth' }); }; });
+    });
+  }
+
+  function processarFila() {
+    var resultados = {};
+    if (enviando) return Promise.resolve(resultados);
+    enviando = true;
+    var fila = App.lsGet(K_FILA, []);
+    var i = 0;
+    function proximo() {
+      if (i >= fila.length) return Promise.resolve();
+      var item = fila[i++];
+      return App.api('fiscal.enviar', item.payload, { timeout: 60000, simularOffline: true }).then(function (r) {
+        resultados[item.client_id] = { ok: true, duplicada: r.duplicada };
+        tirarDaFila(item.client_id);
+        marcarHist(item.client_id, { status: 'ENVIADO', id: r.id, duplicada: r.duplicada });
+        return proximo();
+      }, function (e) {
+        if (e.rede || e.temporario) { resultados[item.client_id] = { rede: true }; return; } // para e tenta depois
+        resultados[item.client_id] = { erro: e.message };
+        tirarDaFila(item.client_id);
+        marcarHist(item.client_id, { status: 'ERRO', erro: e.message });
+        return proximo();
+      });
+    }
+    return proximo().then(function () {
+      enviando = false; renderHistorico(); avisoFila();
+      if (Object.keys(resultados).some(function (k) { return resultados[k].ok; })) carregarParams(true);
+      return resultados;
+    });
+  }
+  function tirarDaFila(id) { App.lsSet(K_FILA, App.lsGet(K_FILA, []).filter(function (x) { return x.client_id !== id; })); }
+  function marcarHist(id, dados) {
+    var hist = App.lsGet(K_HIST, []);
+    hist.forEach(function (x) { if (x.client_id === id) Object.assign(x, dados); });
+    App.lsSet(K_HIST, hist);
+  }
+  function avisoFila() {
+    var n = App.lsGet(K_FILA, []).length, el = $('#aviso-fila');
+    el.hidden = !n;
+    if (n) {
+      el.innerHTML = ICON.nuvem + '<div><b>' + n + (n > 1 ? ' boletins aguardando' : ' boletim aguardando') + ' internet</b>Serão enviados automaticamente. Mantenha esta página aberta quando possível.</div>' +
+        '<button class="btn btn-sec btn-sm acao" type="button" id="btn-reenviar">Enviar agora</button>';
+      $('#btn-reenviar').onclick = function () {
+        var b = this; App.carregando(b, true);
+        processarFila().then(function (r) {
+          var ok = Object.keys(r).filter(function (k) { return r[k].ok; }).length;
+          App.toast(ok ? ok + ' enviado(s) com sucesso!' : 'Ainda sem conexão. Tentaremos de novo.', ok ? 'ok' : 'erro');
+        });
+      };
+    }
+  }
+
+  function renderHistorico() {
+    var hist = App.lsGet(K_HIST, []), ul = $('#lista-envios');
+    if (!hist.length) { ul.innerHTML = '<li class="vazio" style="display:block">Nenhum boletim enviado ainda.</li>'; return; }
+    var rot = { AGUARDANDO: 'Aguardando internet', ENVIADO: 'Enviado', ERRO: 'Recusado' };
+    ul.innerHTML = hist.map(function (x) {
+      return '<li><div class="sec-num"><div><small>SEÇÃO</small>' + h(x.secao) + '</div></div>' +
+        '<div class="meio"><b>' + h(x.local) + '</b><span>' + App.hora(x.quando) + ' · <span class="selo selo-' + x.status + '">' + rot[x.status] + '</span></span>' +
+        (x.erro ? '<div class="tiny" style="color:var(--perigo);margin-top:3px">' + h(x.erro) + '</div>' : '') + '</div>' +
+        '<div class="dir"><div class="v num">' + App.n(x.votos) + '</div><span class="tiny muted">votos</span></div></li>';
+    }).join('');
+  }
+
+  $('#btn-recarregar').addEventListener('click', function () { carregarParams(); });
+  window.addEventListener('online', function () { $('#aviso-conexao').hidden = true; processarFila(); carregarParams(true); });
+  window.addEventListener('offline', function () { avisoConexao(); });
+  setInterval(function () { if (App.lsGet(K_FILA, []).length) processarFila(); }, 20000);
+
+  /* ---------------- Início ---------------- */
+  mostrarIdent();
+  renderHistorico();
+  avisoFila();
+  if (params) montarParams();
+  carregarParams(!!params).then(function () { if (App.lsGet(K_FILA, []).length) processarFila(); });
+  if (!navigator.onLine && params) avisoConexao();
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(function () { /* opcional */ });
+  }
+})();
