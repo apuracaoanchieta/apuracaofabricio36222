@@ -52,6 +52,7 @@ var App = (function () {
       remove: function (n, row) { t[n].splice(row - 2, 1); persistir(); },
       replaceAll: function (n, lista) { t[n] = lista.map(function (o) { return linha(n, o); }); persistir(); },
       // demonstração: o "TSE" é simulado a partir da lista de candidatos aptos (tse-demo.js)
+      demo: true,
       fetchJson: function (url) { return window.TseDemo ? { status: 200, text: JSON.stringify(window.TseDemo.gerar(url)) } : { status: 503, text: '' }; },
       saveFoto: function (dataUrl) { var id = 'F' + uuid().slice(0, 8); fotos[id] = dataUrl; persistir(); return id; },
       getFoto: function (id) { return fotos[id] || fotoDemo(id); },

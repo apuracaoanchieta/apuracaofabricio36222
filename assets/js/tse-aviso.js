@@ -61,3 +61,50 @@ var TseAviso = (function () {
 
   return { verificar: verificar, monitorar: monitorar, mostrar: mostrar };
 })();
+
+/* CONTADOR da atualização automática: "Próxima atualização do TSE em 4:32".
+ * Conta a partir da última execução do agendamento de 5 minutos do Apps Script (tse_auto_agendado),
+ * usando o relógio do servidor (r.agora) para não depender do relógio do computador.
+ * Uso: TseContador.atualizar(dados) a cada carga; os elementos com [data-tse-contador] são preenchidos. */
+var TseContador = (function () {
+  'use strict';
+  var CICLO = 5 * 60000, TOLERANCIA = 3 * 60000;
+  var base = 0, ligado = false, ajuste = 0, timer = null;
+  function ms(st) { var m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(String(st || '')); return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : 0; }
+  function mmss(t) { var s = Math.max(0, Math.ceil(t / 1000)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+
+  function atualizar(dados) {
+    if (!dados || !dados.config) return;
+    ligado = String(dados.config.tse_auto).toUpperCase() === 'TRUE';
+    base = ms(dados.tse_auto_agendado) || ms(dados.tse_auto_ultima);
+    var srv = ms(dados.agora); ajuste = srv ? srv - Date.now() : 0;
+    pintar();
+    if (!timer) timer = setInterval(pintar, 1000);
+  }
+  function estado() {
+    if (!ligado) return null;
+    if (!base) return { texto: 'Atualização automática: aguardando a primeira verificação', classe: 'espera', frac: 0 };
+    var agora = Date.now() + ajuste, falta = base + CICLO - agora;
+    // a página pode ter ficado aberta vários ciclos: pula para o próximo horário provável
+    if (falta < -TOLERANCIA) {
+      var ciclos = Math.ceil(-falta / CICLO);
+      if (ciclos > 3) return { texto: 'Atualização automática sem resposta do agendamento', classe: 'erro', frac: 0 };
+      falta += ciclos * CICLO;
+    }
+    if (falta <= 0) return { texto: 'Verificando o TSE agora…', classe: 'agora', frac: 1 };
+    return { texto: 'Próxima atualização do TSE em ', tempo: mmss(falta), classe: '', frac: 1 - falta / CICLO };
+  }
+  function pintar() {
+    var els = document.querySelectorAll('[data-tse-contador]');
+    if (!els.length) return;
+    var e = estado();
+    Array.prototype.forEach.call(els, function (el) {
+      el.hidden = !e;
+      if (!e) return;
+      el.className = 'tse-contador' + (e.classe ? ' ' + e.classe : '') + (el.dataset.tseContador ? ' ' + el.dataset.tseContador : '');
+      el.title = 'O sistema busca o resultado do TSE sozinho a cada 5 minutos. O horário é aproximado: o Google pode atrasar alguns segundos.';
+      el.innerHTML = '<span class="tc-txt">' + e.texto + (e.tempo ? '<b>' + e.tempo + '</b>' : '') + '</span><i style="width:' + Math.round(e.frac * 100) + '%"></i>';
+    });
+  }
+  return { atualizar: atualizar };
+})();

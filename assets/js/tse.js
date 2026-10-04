@@ -44,7 +44,7 @@
     timer = setInterval(function () { if (!document.hidden) carregar(false); }, (App.CFG.ATUALIZAR_A_CADA_SEGUNDOS || 30) * 1000);
     // demonstração: sem Apps Script, a própria tela faz o papel do agendamento de 5 minutos
     if (App.DEMO && !LEITURA) setInterval(function () {
-      if (dados && String(dados.config.tse_auto).toUpperCase() === 'TRUE') chamar('tse.autoAgora').then(function () { carregar(false); }).catch(function () {});
+      if (dados && String(dados.config.tse_auto).toUpperCase() === 'TRUE') chamar('tse.autoAgora', { demoAgendado: true }).then(function () { carregar(false); }).catch(function () {});
     }, 5 * 60000);
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden && sess && dados) carregar(false); });
@@ -56,6 +56,7 @@
       if (LEITURA) mostrarBloqueio(false);
       dados = r; calc = Tse.calcular(r);
       TseAviso.verificar(r);
+      TseContador.atualizar(r);
       if (LEITURA) $('#aviso-parcial').innerHTML = htmlAvisoParcial();
       $('#t-atualizado').lastChild.textContent = 'Atualizado às ' + App.hora(r.agora) + r.agora.substr(16, 3);
       renderTudo();
@@ -283,7 +284,7 @@
   }
   function htmlAutomatico(cfg) {
     var on = String(cfg.tse_auto).toUpperCase() === 'TRUE', ult = dados.tse_auto_ultima, st = dados.tse_auto_status || '';
-    var atrasado = on && !App.DEMO && (!ult || (Date.now() - msData(ult)) > 12 * 60000);
+    var ag = dados.tse_auto_agendado || ult, atrasado = on && !App.DEMO && (!ag || (msData(dados.agora) - msData(ag)) > 12 * 60000);
     return chaveLinha('rs-auto', 'Atualização automática (a cada 5 minutos)', on,
       '<strong>Ligada:</strong> o sistema busca o TSE sozinho e aplica quando o arquivo for <strong>mais novo</strong> que o último aplicado. Arquivo igual ou mais antigo é ignorado.',
       '<strong>Desligada:</strong> os dados só mudam quando alguém clicar em "Atualizar do TSE" e "Aplicar".') +

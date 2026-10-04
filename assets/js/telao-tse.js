@@ -46,6 +46,7 @@
       $('#t-bloqueio').hidden = true;
       ultimo = r; desenhar(r);
       TseAviso.verificar(r);
+      TseContador.atualizar(r);
       $('#telao').classList.remove('off');
     }).catch(function (e) {
       if (/não foi liberado/.test(e.message)) { $('#t-bloqueio').hidden = false; return; }

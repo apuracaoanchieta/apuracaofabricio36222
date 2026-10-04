@@ -25,6 +25,11 @@
 .t-hora { text-align: right; }
 .t-hora b { display: block; font-size: clamp(22px, 5vh, 70px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
 .t-hora span { font-size: clamp(11px, 1.6vh, 22px); font-weight: 600; opacity: .9; }
+.t-hora .tse-contador.tc-telao { display: block; margin: .6vh 0 0 auto; padding: 0; border: 0; border-radius: 0; background: none; color: inherit; min-height: 0; text-align: right; }
+.t-hora .tse-contador.tc-telao .tc-txt { font-size: clamp(10px, 1.4vh, 19px); opacity: .85; }
+.t-hora .tse-contador.tc-telao b { display: inline; font-size: inherit; line-height: inherit; color: inherit; }
+.t-hora .tse-contador.tc-telao i { display: none; }
+.t-hora .tse-contador[hidden] { display: none; }
 
 .t-principal { display: grid; grid-template-columns: 1.55fr 1fr; gap: 2.4vw; min-height: 0; }
 .t-votos, .t-urnas, .t-locais {

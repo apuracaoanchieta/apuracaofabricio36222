@@ -56,10 +56,11 @@ var Core = (function () {
     ['tse_pct_secoes', '', '% de seções totalizadas no último resultado do TSE (automático)'],
     ['tse_auto_ultima', '', 'Última verificação automática no TSE (automático)'],
     ['tse_auto_status', '', 'Resultado da última verificação automática (automático)'],
+    ['tse_auto_agendado', '', 'Última execução do agendamento de 5 minutos, usada no contador (automático)'],
     ['tse_municipio', '', 'Último resultado do TSE em Anchieta, para a conferência (automático)']
   ];
   var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true, tse_aplicado_em: true, tse_aplicado_por: true, tse_pct_secoes: true,
-    tse_auto_ultima: true, tse_auto_status: true, tse_municipio: true };
+    tse_auto_ultima: true, tse_auto_status: true, tse_auto_agendado: true, tse_municipio: true };
 
   /* Locais e seções de Anchieta — Zona 17 (relação 2026) */
   var SEED = [
@@ -950,7 +951,7 @@ var Core = (function () {
       config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
       tse_aplicado_em: str(cfg.tse_aplicado_em), tse_aplicado_por: str(cfg.tse_aplicado_por),
       tse_pct_secoes: str(cfg.tse_pct_secoes) === '' ? null : Number(cfg.tse_pct_secoes),
-      tse_auto_ultima: str(cfg.tse_auto_ultima), tse_auto_status: str(cfg.tse_auto_status),
+      tse_auto_ultima: str(cfg.tse_auto_ultima), tse_auto_status: str(cfg.tse_auto_status), tse_auto_agendado: str(cfg.tse_auto_agendado),
       tse_municipio: (function () { try { return cfg.tse_municipio ? JSON.parse(cfg.tse_municipio) : null; } catch (e) { return null; } })(),
       partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
       historico: mapTseHistorico(db).map(strip), agora: db.stamp()
@@ -967,6 +968,7 @@ var Core = (function () {
     return {
       config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
       tse_aplicado_em: str(cfg.tse_aplicado_em), tse_pct_secoes: str(cfg.tse_pct_secoes) === '' ? null : Number(cfg.tse_pct_secoes),
+      tse_auto_agendado: str(cfg.tse_auto_agendado), tse_auto_ultima: str(cfg.tse_auto_ultima),
       partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
       historico: mapTseHistorico(db).map(strip), agora: db.stamp(), leitura: true
     };
@@ -1188,11 +1190,15 @@ var Core = (function () {
     db.lock(function () {
       gravarConfigInterna(db, 'tse_auto_ultima', db.stamp());
       gravarConfigInterna(db, 'tse_auto_status', str(status).substr(0, 200));
+      // o contador de "próxima atualização" conta a partir da última execução do AGENDAMENTO (não do "Verificar agora")
+      if (origem === 'agendado') gravarConfigInterna(db, 'tse_auto_agendado', db.stamp());
     });
     return { ativo: true, mudou: mudou, status: status, municipio: mun };
   }
   ACOES['tse.autoAgora'] = function (db, req) {
     exigeApuracaoTse(db, req);
+    // na demonstração a própria tela faz o papel do agendamento de 5 minutos
+    if (req.demoAgendado && db.demo) return executarTseAutomatico(db, 'agendado', false);
     return executarTseAutomatico(db, 'manual', true);
   };
   ACOES['tse.municipio'] = function (db, req) {
