@@ -46,9 +46,11 @@ var Core = (function () {
     ['tse_url', 'https://resultados.tse.jus.br/oficial/ele2026/6259/dados/es/es-c0007-e006259-u.json', 'Endereço do arquivo de resultado do TSE (Deputado Estadual/ES)'],
     ['vagas_total', '30', 'Vagas em disputa na Assembleia Legislativa'],
     ['tse_atualizado_em', '', 'Data/hora do último resultado aplicado do TSE (automático)'],
-    ['tse_situacao', '', 'Situação da totalização no último resultado do TSE (automático)']
+    ['tse_situacao', '', 'Situação da totalização no último resultado do TSE (automático)'],
+    ['tse_aplicado_em', '', 'Quando o último resultado do TSE foi aplicado no sistema (automático)'],
+    ['tse_aplicado_por', '', 'Quem aplicou o último resultado do TSE (automático)']
   ];
-  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true };
+  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true, tse_aplicado_em: true, tse_aplicado_por: true };
 
   /* Locais e seções de Anchieta — Zona 17 (relação 2026) */
   var SEED = [
@@ -922,6 +924,7 @@ var Core = (function () {
     var cfg = lerConfig(db);
     return {
       config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
+      tse_aplicado_em: str(cfg.tse_aplicado_em), tse_aplicado_por: str(cfg.tse_aplicado_por),
       partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
       historico: mapTseHistorico(db).map(strip), agora: db.stamp()
     };
@@ -969,6 +972,8 @@ var Core = (function () {
       db.replaceAll('TSE_CANDIDATOS', ordemC.map(function (id) { return strip(cs[id]); }));
       gravarConfigInterna(db, 'tse_atualizado_em', str(req.atualizadoEm).substr(0, 40) || agora);
       gravarConfigInterna(db, 'tse_situacao', str(req.secoesTotalizadas).substr(0, 80));
+      gravarConfigInterna(db, 'tse_aplicado_em', agora);
+      gravarConfigInterna(db, 'tse_aplicado_por', u.usuario);
       log(db, u.usuario, 'TSE_APLICAR', partidos.length + ' partidos, ' + candidatos.length + ' candidatos');
       return { partidos: ordemP.length, candidatos: ordemC.length };
     });

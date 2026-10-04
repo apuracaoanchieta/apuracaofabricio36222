@@ -83,6 +83,7 @@
       this.value = d ? Number(d).toLocaleString('pt-BR') : '';
     });
   }
+  function dataHoraCompleta(st) { var x = String(st || ''); return x.length >= 19 ? x.substr(8, 2) + '/' + x.substr(5, 2) + '/' + x.substr(0, 4) + ' ' + x.substr(11, 8) : x; }
   function valorNumero(v) { return String(v || '').replace(/\D/g, ''); }
 
   /* ================= 1. RESULTADO TSE (integração) ================= */
@@ -92,7 +93,8 @@
     html += '<section class="card"><div class="card-titulo"><h2>Integração com o TSE</h2>' +
       '<button class="btn btn-ghost btn-sm" id="rs-config">' + ICON.lapis + 'Configurar</button></div>' +
       '<div class="resumo-envio" style="margin-bottom:16px">' +
-      '<div class="linha"><span>Último resultado aplicado</span><b>' + (dados.tse_atualizado_em ? h(dados.tse_atualizado_em) : 'nenhum ainda') + '</b></div>' +
+      '<div class="linha"><span>Arquivo do TSE gerado em</span><b>' + (dados.tse_atualizado_em ? h(dados.tse_atualizado_em) : 'nenhum aplicado ainda') + '</b></div>' +
+      '<div class="linha"><span>Aplicado por você às</span><b>' + (dados.tse_aplicado_em ? dataHoraCompleta(dados.tse_aplicado_em) : '—') + '</b></div>' +
       '<div class="linha"><span>Totalização</span><b>' + (dados.tse_situacao ? h(dados.tse_situacao) : '—') + '</b></div>' +
       '<div class="linha"><span>Vagas em disputa</span><b>' + calc.vagas + '</b></div>' +
       '<div class="linha"><span>Candidato · partido</span><b>' + h(nomeCand()) + ' · ' + h(cfg.candidato_numero || '') + ' · ' + h(calc.grupoNosso.nome) + '</b></div></div>' +
