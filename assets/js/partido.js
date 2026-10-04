@@ -42,6 +42,7 @@
     ocupado = true;
     App.api('partido.dados', { token: sess.token }).then(function (r) {
       painel.atualizar(r);
+      $('#btn-tse').hidden = String(r.config.tse_partido_visivel).toUpperCase() !== 'TRUE';
       $('#t-titulo').textContent = (r.config.candidato_nome || 'Fabricio Petri') + ' ' + (r.config.candidato_numero || '');
       var at = $('#t-atualizado'); at.classList.remove('off'); at.lastChild.textContent = App.hora(r.agora) + r.agora.substr(16, 3);
     }).catch(function (e) {

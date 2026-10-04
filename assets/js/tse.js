@@ -48,12 +48,24 @@
     if (ocupado) return Promise.resolve();
     ocupado = true;
     return chamar(LEITURA ? 'tse.consulta' : 'tse.dados').then(function (r) {
+      if (LEITURA) mostrarBloqueio(false);
       dados = r; calc = Tse.calcular(r);
       if (LEITURA) $('#aviso-parcial').innerHTML = htmlAvisoParcial();
       $('#t-atualizado').lastChild.textContent = 'Atualizado às ' + App.hora(r.agora) + r.agora.substr(16, 3);
       renderTudo();
-    }).catch(function (e) { if (mostrarErro) App.toast(e.message, 'erro'); })
-      .then(function () { ocupado = false; });
+    }).catch(function (e) {
+      if (LEITURA && /não foi liberado/.test(e.message)) { dados = null; mostrarBloqueio(true); return; }
+      if (mostrarErro) App.toast(e.message, 'erro');
+    }).then(function () { ocupado = false; });
+  }
+  /* acesso do candidato bloqueado pela apuração: some tudo e fica só o aviso (volta sozinho quando liberar) */
+  function mostrarBloqueio(sim) {
+    var b = $('#tse-bloqueio');
+    if (!b) { b = document.createElement('section'); b.id = 'tse-bloqueio'; b.className = 'card centro tse-bloqueio'; $('main.wrap-l').prepend(b); }
+    b.hidden = !sim;
+    b.innerHTML = '<div class="sucesso-icone">' + ICON.relogio + '</div><h2>Resultado oficial do TSE ainda não liberado</h2><p class="muted">A equipe de apuração vai liberar esta tela quando decidir. Assim que for liberada, ela aparece aqui sozinha — não precisa sair nem atualizar a página.</p><a class="btn btn-sec" href="partido.html">← Voltar aos resultados</a>';
+    $$('main.wrap-l > :not(#tse-bloqueio)').forEach(function (x) { x.style.display = sim ? 'none' : ''; });
+    var abas = $('.abas'); if (abas) abas.style.display = sim ? 'none' : '';
   }
 
   /* ================= ABAS ================= */
@@ -149,6 +161,9 @@
       '<div class="linha"><span>Vagas em disputa</span><b>' + calc.vagas + '</b></div>' +
       '<div class="linha"><span>Candidato · partido</span><b>' + h(nomeCand()) + ' · ' + h(cfg.candidato_numero || '') + ' · ' + h(calc.grupoNosso.nome) + '</b></div></div>' +
       '<p class="tiny muted" style="word-break:break-all;margin:-4px 0 14px">Fonte: ' + h(cfg.tse_url || '(não configurada)') + '</p>' +
+      '<div class="chave-linha chave-tse-partido' + (String(cfg.tse_partido_visivel).toUpperCase() === 'TRUE' ? ' on' : '') + '"><div><b>Candidato pode ver o Resultado TSE</b><span>' +
+        (String(cfg.tse_partido_visivel).toUpperCase() === 'TRUE' ? '<strong>Liberado:</strong> o acesso do Partido/candidato está vendo a projeção, os eleitos, os gráficos e o telão do TSE.' : '<strong>Bloqueado:</strong> o candidato não vê nada do TSE. Ligue quando a equipe decidir liberar.') +
+        '</span></div><label class="switch"><input type="checkbox" id="rs-partido"' + (String(cfg.tse_partido_visivel).toUpperCase() === 'TRUE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<button class="btn btn-azul btn-xl" id="rs-buscar"' + (tseState.carregando ? ' disabled' : '') + '>' + ICON.atualizar + (tseState.carregando ? 'Buscando no TSE…' : 'Atualizar do TSE') + '</button>' +
       '<p class="ajuda" style="margin-top:8px">A busca mostra uma prévia. Nada é gravado até você clicar em <strong>Aplicar</strong>.</p></section>';
 
@@ -171,6 +186,18 @@
     el.innerHTML = html;
 
     $('#rs-buscar', el).onclick = atualizarDoTSE;
+    $('#rs-partido', el).onchange = function () {
+      var chk = this, liberar = chk.checked;
+      App.confirmar(liberar ? 'Liberar para o candidato?' : 'Bloquear para o candidato?',
+        liberar ? 'O acesso do Partido/candidato passa a ver a projeção, os eleitos, os gráficos e o telão do TSE (somente visualização).' : 'O candidato deixa de ver o Resultado oficial do TSE. Se estiver com a tela aberta, ela é bloqueada em até 30 segundos.',
+        liberar ? 'Liberar' : 'Bloquear', !liberar).then(function (ok) {
+        if (!ok) { chk.checked = !liberar; return; }
+        chk.disabled = true;
+        chamar('apuracao.salvarConfig', { valores: { tse_partido_visivel: liberar ? 'TRUE' : 'FALSE' } }).then(function () {
+          App.toast(liberar ? 'Liberado para o candidato.' : 'Bloqueado para o candidato.', 'ok'); return carregar(true);
+        }).catch(function (e) { chk.checked = !liberar; chk.disabled = false; App.toast(e.message, 'erro'); });
+      });
+    };
     $('#rs-config', el).onclick = modalConfig;
     $('#rs-novo-partido', el).onclick = function () { modalPartido(null); };
     $$('[data-edpartido]', el).forEach(function (b) { b.onclick = function () { modalPartido(b.dataset.edpartido); }; });

@@ -43,9 +43,11 @@
     if (ocupado || !sess) return;
     ocupado = true;
     App.api('tse.consulta', { token: sess.token }).then(function (r) {
+      $('#t-bloqueio').hidden = true;
       ultimo = r; desenhar(r);
       $('#telao').classList.remove('off');
     }).catch(function (e) {
+      if (/não foi liberado/.test(e.message)) { $('#t-bloqueio').hidden = false; return; }
       $('#telao').classList.add('off');
       $('#t-atualizado').textContent = 'sem conexão — tentando de novo';
       if (/Sessão|acesso/.test(e.message)) { ['apuracao', 'partido'].forEach(function (a) { var x = App.sessao.get(a); if (x && x.token === sess.token) App.sessao.sair(a); }); sess = null; clearInterval(timer); telaLogin(); App.toast(e.message, 'erro'); }

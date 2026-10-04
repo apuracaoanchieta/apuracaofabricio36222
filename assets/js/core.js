@@ -45,6 +45,7 @@ var Core = (function () {
     ['pasta_fotos_id', '', 'ID da pasta do Google Drive com as fotos (preenchido automaticamente)'],
     ['tse_url', 'https://resultados.tse.jus.br/oficial/ele2026/6259/dados/es/es-c0007-e006259-u.json', 'Endereço do arquivo de resultado do TSE (Deputado Estadual/ES)'],
     ['vagas_total', '30', 'Vagas em disputa na Assembleia Legislativa'],
+    ['tse_partido_visivel', 'FALSE', 'TRUE = o acesso do Partido/candidato pode ver o Resultado oficial do TSE; FALSE = bloqueado'],
     ['tse_atualizado_em', '', 'Data/hora do último resultado aplicado do TSE (automático)'],
     ['tse_situacao', '', 'Situação da totalização no último resultado do TSE (automático)'],
     ['tse_aplicado_em', '', 'Quando o último resultado do TSE foi aplicado no sistema (automático)'],
@@ -948,9 +949,12 @@ var Core = (function () {
   };
 
   /* Consulta SOMENTE LEITURA para o acesso do Partido/candidato (não grava nada) */
+  var MSG_TSE_BLOQUEADO = 'O Resultado oficial do TSE ainda não foi liberado pela apuração.';
   ACOES['tse.consulta'] = function (db, req) {
-    autenticar(db, req.token, [PERFIS.PARTIDO, PERFIS.APURACAO]);
+    var u = autenticar(db, req.token, [PERFIS.PARTIDO, PERFIS.APURACAO]);
     var cfg = lerConfig(db);
+    // a equipe de apuração decide se o candidato pode ver (Parâmetros > Geral ou tela Apuração TSE)
+    if (u.perfil !== PERFIS.APURACAO && !bool(cfg.tse_partido_visivel)) { var e = erro(MSG_TSE_BLOQUEADO); e.bloqueado = true; throw e; }
     return {
       config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
       tse_aplicado_em: str(cfg.tse_aplicado_em), tse_pct_secoes: str(cfg.tse_pct_secoes) === '' ? null : Number(cfg.tse_pct_secoes),
@@ -1153,7 +1157,7 @@ var Core = (function () {
       r.ok = true;
       return r;
     } catch (e) {
-      return { ok: false, erro: e.publico ? e.message : ('Erro interno: ' + (e && e.message ? e.message : e)) };
+      return { ok: false, erro: e.publico ? e.message : ('Erro interno: ' + (e && e.message ? e.message : e)), bloqueado: e && e.bloqueado ? true : undefined };
     }
   }
 

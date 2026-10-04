@@ -169,3 +169,8 @@
 .t-el-resumo { text-align: right; }
 @media (orientation: portrait) { .t-eleitos-cab { flex-wrap: wrap; } .t-el-resumo { text-align: left; } }
 .telao-tse .t-falta { color: #ffd36b !important; font-size: 1.25em; }
+.telao-tse .t-bloqueio { position: absolute; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; text-align: center; padding: 6vw;
+  background: radial-gradient(120% 90% at 100% 100%, #0089b8 0%, #019fc6 45%, #02a9d1 100%); }
+.telao-tse .t-bloqueio[hidden] { display: none; }
+.telao-tse .t-bloqueio b { font-size: clamp(24px, 6vh, 80px); font-weight: 900; line-height: 1.1; }
+.telao-tse .t-bloqueio span { font-size: clamp(14px, 2.6vh, 36px); font-weight: 600; opacity: .9; }

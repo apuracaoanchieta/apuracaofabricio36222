@@ -593,6 +593,7 @@
       '<div class="grid-2"><div class="campo"><label for="pg-mun">Município dos fiscais</label><input class="input" id="pg-mun" list="pg-dl-mun" value="' + h(c.municipio_principal) + '"><datalist id="pg-dl-mun">' + municipiosConhecidos().map(function (m) { return '<option value="' + h(m) + '">'; }).join('') + '</datalist><div class="ajuda">Os fiscais só veem os locais deste município.</div></div></div>' +
       '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px;margin-top:4px"><div><b>Alerta de votos acima do esperado</b><span>Avisa o fiscal, na tela de conferência, quando ele digitar mais votos que o limite.</span></div><label class="switch"><input type="checkbox" id="pg-alerta"' + (String(c.alerta_votos_ativo).toUpperCase() === 'TRUE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<div class="campo" id="pg-max-campo" style="max-width:280px"><label for="pg-max">Limite de votos por seção</label><input class="input" id="pg-max" inputmode="numeric" value="' + h(App.formatarVotos(c.alerta_votos_max)) + '"><div class="ajuda">Acima deste número o fiscal recebe o aviso.</div></div>' +
+      '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px;margin-top:4px"><div><b>Liberar o Resultado oficial do TSE para o candidato</b><span>Ligado: o acesso do Partido/candidato vê o botão "Resultado oficial do TSE" e o telão do TSE. Desligado: fica bloqueado, mesmo que ele tenha o link.</span></div><label class="switch"><input type="checkbox" id="pg-tsepartido"' + (String(c.tse_partido_visivel).toUpperCase() === 'TRUE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px;margin-top:4px"><div><b>Foto do BU obrigatória</b><span>Exigir a foto no envio do fiscal.</span></div><label class="switch"><input type="checkbox" id="pg-foto"' + (String(c.foto_obrigatoria).toUpperCase() !== 'FALSE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<button class="btn btn-azul" type="submit" id="pg-salvar" style="margin-top:12px">Salvar alterações</button></form>' +
       '<div><section class="card"><div class="card-titulo"><h3>Links para compartilhar</h3></div>' +
@@ -631,7 +632,8 @@
         titulo: $('#pg-titulo').value, candidato_nome: $('#pg-nome').value, candidato_numero: $('#pg-num').value,
         cargo: $('#pg-cargo').value, partido: $('#pg-partido').value, municipio_principal: $('#pg-mun').value.trim().toUpperCase(),
         alerta_votos_ativo: $('#pg-alerta').checked ? 'TRUE' : 'FALSE',
-        alerta_votos_max: $('#pg-max').value.replace(/\D/g, '') || '400', foto_obrigatoria: $('#pg-foto').checked ? 'TRUE' : 'FALSE'
+        alerta_votos_max: $('#pg-max').value.replace(/\D/g, '') || '400', foto_obrigatoria: $('#pg-foto').checked ? 'TRUE' : 'FALSE',
+        tse_partido_visivel: $('#pg-tsepartido').checked ? 'TRUE' : 'FALSE'
       } }).then(function () { App.toast('Configurações salvas.', 'ok'); return recarregarParametros(); })
         .catch(function (e2) { App.toast(e2.message, 'erro'); App.carregando(b, false); });
     };
