@@ -45,6 +45,7 @@
     App.api('tse.consulta', { token: sess.token }).then(function (r) {
       $('#t-bloqueio').hidden = true;
       ultimo = r; desenhar(r);
+      TseAviso.verificar(r);
       $('#telao').classList.remove('off');
     }).catch(function (e) {
       if (/não foi liberado/.test(e.message)) { $('#t-bloqueio').hidden = false; return; }

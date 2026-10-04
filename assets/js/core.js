@@ -45,14 +45,21 @@ var Core = (function () {
     ['pasta_fotos_id', '', 'ID da pasta do Google Drive com as fotos (preenchido automaticamente)'],
     ['tse_url', 'https://resultados.tse.jus.br/oficial/ele2026/6259/dados/es/es-c0007-e006259-u.json', 'Endereço do arquivo de resultado do TSE (Deputado Estadual/ES)'],
     ['vagas_total', '30', 'Vagas em disputa na Assembleia Legislativa'],
+    ['tse_auto', 'FALSE', 'TRUE = busca e aplica o resultado do TSE sozinho a cada 5 minutos (precisa rodar instalarAutomatico uma vez)'],
+    ['tse_avisos', 'FALSE', 'TRUE = mostra avisos discretos quando a situação do candidato muda'],
+    ['tse_url_municipio', 'https://resultados.tse.jus.br/oficial/ele2026/6259/dados/es/es56073-c0007-e006259-u.json', 'Endereço do resultado do TSE de Anchieta (código TSE 56073), para a conferência'],
     ['tse_partido_visivel', 'FALSE', 'TRUE = o acesso do Partido/candidato pode ver o Resultado oficial do TSE; FALSE = bloqueado'],
     ['tse_atualizado_em', '', 'Data/hora do último resultado aplicado do TSE (automático)'],
     ['tse_situacao', '', 'Situação da totalização no último resultado do TSE (automático)'],
     ['tse_aplicado_em', '', 'Quando o último resultado do TSE foi aplicado no sistema (automático)'],
     ['tse_aplicado_por', '', 'Quem aplicou o último resultado do TSE (automático)'],
-    ['tse_pct_secoes', '', '% de seções totalizadas no último resultado do TSE (automático)']
+    ['tse_pct_secoes', '', '% de seções totalizadas no último resultado do TSE (automático)'],
+    ['tse_auto_ultima', '', 'Última verificação automática no TSE (automático)'],
+    ['tse_auto_status', '', 'Resultado da última verificação automática (automático)'],
+    ['tse_municipio', '', 'Último resultado do TSE em Anchieta, para a conferência (automático)']
   ];
-  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true, tse_aplicado_em: true, tse_aplicado_por: true, tse_pct_secoes: true };
+  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true, tse_aplicado_em: true, tse_aplicado_por: true, tse_pct_secoes: true,
+    tse_auto_ultima: true, tse_auto_status: true, tse_municipio: true };
 
   /* Locais e seções de Anchieta — Zona 17 (relação 2026) */
   var SEED = [
@@ -943,6 +950,8 @@ var Core = (function () {
       config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
       tse_aplicado_em: str(cfg.tse_aplicado_em), tse_aplicado_por: str(cfg.tse_aplicado_por),
       tse_pct_secoes: str(cfg.tse_pct_secoes) === '' ? null : Number(cfg.tse_pct_secoes),
+      tse_auto_ultima: str(cfg.tse_auto_ultima), tse_auto_status: str(cfg.tse_auto_status),
+      tse_municipio: (function () { try { return cfg.tse_municipio ? JSON.parse(cfg.tse_municipio) : null; } catch (e) { return null; } })(),
       partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
       historico: mapTseHistorico(db).map(strip), agora: db.stamp()
     };
@@ -977,41 +986,43 @@ var Core = (function () {
   };
 
   /* Aplica a prévia: grava partidos e candidatos sempre com id fixo (sem duplicar se repetir) */
-  ACOES['tse.aplicar'] = function (db, req) {
-    var u = exigeApuracaoTse(db, req);
-    var partidos = Array.isArray(req.partidos) ? req.partidos : [], candidatos = Array.isArray(req.candidatos) ? req.candidatos : [];
+  /* grava a prévia do TSE (sem lock: quem chama trava) — ids fixos, nunca duplica */
+  function aplicarPreviaTse(db, usuario, pv) {
+    var partidos = Array.isArray(pv.partidos) ? pv.partidos : [], candidatos = Array.isArray(pv.candidatos) ? pv.candidatos : [];
     if (!partidos.length && !candidatos.length) throw erro('A prévia está vazia.');
     if (partidos.length > 200 || candidatos.length > 3000) throw erro('Prévia grande demais.');
-    return db.lock(function () {
-      var agora = db.stamp();
-      var ps = {}, ordemP = [];
-      mapTsePartidos(db).forEach(function (p) { ps[p.id] = p; ordemP.push(p.id); });
-      partidos.forEach(function (p) {
-        var sigla = str(p.sigla).toUpperCase().substr(0, 60); if (!sigla) return;
-        var id = idPartidoTse(sigla);
-        if (!ps[id]) ordemP.push(id);
-        ps[id] = { id: id, sigla: sigla, agremiacao: str(p.agremiacao).substr(0, 120), votos: numOuZero(p.votos), origem: 'TSE', atualizado_em: agora };
-      });
-      var cs = {}, ordemC = [];
-      mapTseCandidatos(db).forEach(function (c) { cs[c.id] = c; ordemC.push(c.id); });
-      candidatos.forEach(function (c) {
-        var numero = digits(c.numero).substr(0, 8); if (!numero) return;
-        var id = idCandidatoTse(numero);
-        if (!cs[id]) ordemC.push(id);
-        cs[id] = { id: id, numero: numero, nome: str(c.nome).substr(0, 80) || ('Candidato ' + numero), partido: str(c.partido).toUpperCase().substr(0, 120),
-          situacao: str(c.situacao).substr(0, 40), votos: numOuZero(c.votos), origem: 'TSE', atualizado_em: agora };
-      });
-      db.replaceAll('TSE_PARTIDOS', ordemP.map(function (id) { return strip(ps[id]); }));
-      db.replaceAll('TSE_CANDIDATOS', ordemC.map(function (id) { return strip(cs[id]); }));
-      gravarConfigInterna(db, 'tse_atualizado_em', str(req.atualizadoEm).substr(0, 40) || agora);
-      gravarConfigInterna(db, 'tse_situacao', str(req.secoesTotalizadas).substr(0, 80));
-      gravarConfigInterna(db, 'tse_aplicado_em', agora);
-      var pctS = Number(req.pctSecoes);
-      gravarConfigInterna(db, 'tse_pct_secoes', req.pctSecoes === null || req.pctSecoes === undefined || req.pctSecoes === '' || !isFinite(pctS) ? '' : String(Math.max(0, Math.min(100, pctS))));
-      gravarConfigInterna(db, 'tse_aplicado_por', u.usuario);
-      log(db, u.usuario, 'TSE_APLICAR', partidos.length + ' partidos, ' + candidatos.length + ' candidatos');
-      return { partidos: ordemP.length, candidatos: ordemC.length };
+    var agora = db.stamp();
+    var ps = {}, ordemP = [];
+    mapTsePartidos(db).forEach(function (p) { ps[p.id] = p; ordemP.push(p.id); });
+    partidos.forEach(function (p) {
+      var sigla = str(p.sigla).toUpperCase().substr(0, 60); if (!sigla) return;
+      var id = idPartidoTse(sigla);
+      if (!ps[id]) ordemP.push(id);
+      ps[id] = { id: id, sigla: sigla, agremiacao: str(p.agremiacao).substr(0, 120), votos: numOuZero(p.votos), origem: 'TSE', atualizado_em: agora };
     });
+    var cs = {}, ordemC = [];
+    mapTseCandidatos(db).forEach(function (c) { cs[c.id] = c; ordemC.push(c.id); });
+    candidatos.forEach(function (c) {
+      var numero = digits(c.numero).substr(0, 8); if (!numero) return;
+      var id = idCandidatoTse(numero);
+      if (!cs[id]) ordemC.push(id);
+      cs[id] = { id: id, numero: numero, nome: str(c.nome).substr(0, 80) || ('Candidato ' + numero), partido: str(c.partido).toUpperCase().substr(0, 120),
+        situacao: str(c.situacao).substr(0, 40), votos: numOuZero(c.votos), origem: 'TSE', atualizado_em: agora };
+    });
+    db.replaceAll('TSE_PARTIDOS', ordemP.map(function (id) { return strip(ps[id]); }));
+    db.replaceAll('TSE_CANDIDATOS', ordemC.map(function (id) { return strip(cs[id]); }));
+    gravarConfigInterna(db, 'tse_atualizado_em', str(pv.atualizadoEm).substr(0, 40) || agora);
+    gravarConfigInterna(db, 'tse_situacao', str(pv.secoesTotalizadas).substr(0, 80));
+    gravarConfigInterna(db, 'tse_aplicado_em', agora);
+    var pctS = Number(pv.pctSecoes);
+    gravarConfigInterna(db, 'tse_pct_secoes', pv.pctSecoes === null || pv.pctSecoes === undefined || pv.pctSecoes === '' || !isFinite(pctS) ? '' : String(Math.max(0, Math.min(100, pctS))));
+    gravarConfigInterna(db, 'tse_aplicado_por', usuario);
+    log(db, usuario, 'TSE_APLICAR', partidos.length + ' partidos, ' + candidatos.length + ' candidatos');
+    return { partidos: ordemP.length, candidatos: ordemC.length };
+  }
+  ACOES['tse.aplicar'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    return db.lock(function () { return aplicarPreviaTse(db, u.usuario, req); });
   };
 
   ACOES['tse.salvarPartido'] = function (db, req) {
@@ -1094,26 +1105,101 @@ var Core = (function () {
   /* Histórico: no máx. 150 pontos; sem "forçar", um ponto a menos de 2 min do último o substitui */
   var MAX_PONTOS_HISTORICO = 150, INTERVALO_MIN_SNAPSHOT_MS = 2 * 60 * 1000;
   function msDe(stamp) { var m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(str(stamp)); return m ? Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : 0; }
-  ACOES['tse.registrar'] = function (db, req) {
-    var u = exigeApuracaoTse(db, req);
-    var p = req.ponto || {};
+  function registrarPontoTse(db, p, forcar) {
     var num = function (v) { var n = Number(v); return v === null || v === undefined || v === '' || !isFinite(n) ? '' : n; };
     var marcos = { 'eleito': 1, 'fora-faixa': 1, 'abaixo-clausula': 1, 'sem-candidato': 1, 'sem-dados': 1 };
+    var ponto = { t: db.stamp(), votos_validos: num(p.votosValidos), qe: num(p.QE), vagas_partido: num(p.vagasDoPartido),
+      candidato_votos: num(p.candidatoVotos), candidato_pct_qe: num(p.candidatoPctQE), marco: marcos[str(p.marco)] ? str(p.marco) : '' };
+    var pontos = mapTseHistorico(db), ultimo = pontos[pontos.length - 1], substituiu = false;
+    if (!forcar && ultimo && (msDe(ponto.t) - msDe(ultimo.t)) < INTERVALO_MIN_SNAPSHOT_MS) { db.update('TSE_HISTORICO', ultimo._row, ponto); substituiu = true; }
+    else db.append('TSE_HISTORICO', ponto);
+    var todos = mapTseHistorico(db);
+    if (todos.length > MAX_PONTOS_HISTORICO) {
+      todos.slice(0, todos.length - MAX_PONTOS_HISTORICO).sort(function (a, b) { return b._row - a._row; })
+        .forEach(function (x) { db.remove('TSE_HISTORICO', x._row); });
+    }
+    return { substituiu: substituiu, marco: ponto.marco };
+  }
+  ACOES['tse.registrar'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
     return db.lock(function () {
-      var ponto = { t: db.stamp(), votos_validos: num(p.votosValidos), qe: num(p.QE), vagas_partido: num(p.vagasDoPartido),
-        candidato_votos: num(p.candidatoVotos), candidato_pct_qe: num(p.candidatoPctQE), marco: marcos[str(p.marco)] ? str(p.marco) : '' };
-      var pontos = mapTseHistorico(db), ultimo = pontos[pontos.length - 1], substituiu = false;
-      if (!req.forcar && ultimo && (msDe(ponto.t) - msDe(ultimo.t)) < INTERVALO_MIN_SNAPSHOT_MS) { db.update('TSE_HISTORICO', ultimo._row, ponto); substituiu = true; }
-      else db.append('TSE_HISTORICO', ponto);
-      var todos = mapTseHistorico(db);
-      if (todos.length > MAX_PONTOS_HISTORICO) {
-        todos.slice(0, todos.length - MAX_PONTOS_HISTORICO).sort(function (a, b) { return b._row - a._row; })
-          .forEach(function (x) { db.remove('TSE_HISTORICO', x._row); });
-      }
-      if (req.forcar) log(db, u.usuario, 'TSE_REGISTRAR', ponto.marco);
-      return { substituiu: substituiu };
+      var r = registrarPontoTse(db, req.ponto || {}, !!req.forcar);
+      if (req.forcar) log(db, u.usuario, 'TSE_REGISTRAR', r.marco);
+      return { substituiu: r.substituiu };
     });
   };
+
+  /* ---------- Atualização automática e resultado de Anchieta ---------- */
+  // "04/10/2026 19:30:05" -> "20261004193005" (para saber se o arquivo do TSE é mais novo)
+  function chaveDataTse(s) {
+    var m = /(\d{2})\/(\d{2})\/(\d{4})\D+(\d{2}):(\d{2})(?::(\d{2}))?/.exec(str(s));
+    return m ? m[3] + m[2] + m[1] + m[4] + m[5] + (m[6] || '00') : '';
+  }
+  function buscarJsonTse(db, url) {
+    if (!url) throw erro('Endereço do TSE não configurado.');
+    if (!db.fetchJson) throw erro('A busca no TSE não está disponível neste ambiente.');
+    var resp = db.fetchJson(url);
+    if (resp.status !== 200) throw erro('O TSE respondeu ' + resp.status + ' — os dados podem ainda não estar publicados.');
+    try { return JSON.parse(resp.text); } catch (e) { throw erro('A resposta do TSE não veio em JSON válido.'); }
+  }
+  function dadosTseParaCalculo(db, cfg) {
+    return { config: configPublica(cfg), partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip) };
+  }
+  /* resultado do TSE em Anchieta: só o que a conferência precisa */
+  function resumoMunicipioTse(db, cfg) {
+    var raw = buscarJsonTse(db, str(cfg.tse_url_municipio));
+    var pv = normalizarResultadoTse(raw), num = digits(cfg.candidato_numero), cand = null, validos = 0;
+    pv.candidatos.forEach(function (c) { if (digits(c.numero) === num) cand = c; });
+    pv.partidos.forEach(function (p) { validos += Number(p.votos) || 0; });
+    return { votos: cand ? cand.votos : null, encontrado: !!cand, validos: validos, pctSecoes: pv.pctSecoes, situacao: pv.secoesTotalizadas,
+      atualizadoEm: pv.atualizadoEm, buscadoEm: db.stamp() };
+  }
+  function atualizarMunicipioTse(db) {
+    var cfg = lerConfig(db), r = resumoMunicipioTse(db, cfg);
+    db.lock(function () { gravarConfigInterna(db, 'tse_municipio', JSON.stringify(r)); });
+    return r;
+  }
+  /* Busca o TSE e aplica sozinho se o arquivo for MAIS NOVO que o último aplicado.
+   * Usado pelo agendamento do Apps Script (a cada 5 min) e pelo botão "Verificar agora". */
+  function executarTseAutomatico(db, origem, ignorarChave) {
+    var cfg = lerConfig(db);
+    if (!ignorarChave && !bool(cfg.tse_auto)) return { ativo: false };
+    var status, mudou = false;
+    try {
+      var pv = normalizarResultadoTse(buscarJsonTse(db, str(cfg.tse_url)));
+      var novo = chaveDataTse(pv.atualizadoEm), atual = chaveDataTse(cfg.tse_atualizado_em);
+      if (novo && atual && novo <= atual) status = 'sem novidade (arquivo do TSE de ' + str(cfg.tse_atualizado_em) + ')';
+      else if (!novo && str(pv.atualizadoEm) === str(cfg.tse_atualizado_em)) status = 'sem novidade';
+      else {
+        db.lock(function () {
+          aplicarPreviaTse(db, origem === 'agendado' ? 'automatico' : 'apuracao', pv);
+          // registra o ponto do histórico com a mesma conta da tela (Tse, em tse-logica.js)
+          if (typeof Tse !== 'undefined') {
+            var ponto = Tse.montarPontoHistorico(Tse.calcular(dadosTseParaCalculo(db, lerConfig(db))).st);
+            if (ponto) registrarPontoTse(db, ponto, false);
+          }
+        });
+        mudou = true;
+        status = 'aplicado: arquivo do TSE de ' + (pv.atualizadoEm || 'data não informada') + (pv.secoesTotalizadas ? ' · ' + pv.secoesTotalizadas : '');
+      }
+    } catch (e) { status = 'erro: ' + (e && e.message ? e.message : e); }
+    var mun = null;
+    try { mun = atualizarMunicipioTse(db); } catch (e2) { /* a conferência de Anchieta é opcional */ }
+    db.lock(function () {
+      gravarConfigInterna(db, 'tse_auto_ultima', db.stamp());
+      gravarConfigInterna(db, 'tse_auto_status', str(status).substr(0, 200));
+    });
+    return { ativo: true, mudou: mudou, status: status, municipio: mun };
+  }
+  ACOES['tse.autoAgora'] = function (db, req) {
+    exigeApuracaoTse(db, req);
+    return executarTseAutomatico(db, 'manual', true);
+  };
+  ACOES['tse.municipio'] = function (db, req) {
+    exigeApuracaoTse(db, req);
+    return { municipio: atualizarMunicipioTse(db) };
+  };
+
   ACOES['tse.limparHistorico'] = function (db, req) {
     var u = exigeApuracaoTse(db, req);
     return db.lock(function () { db.replaceAll('TSE_HISTORICO', []); log(db, u.usuario, 'TSE_LIMPAR_HISTORICO', ''); return {}; });
@@ -1163,7 +1249,7 @@ var Core = (function () {
 
   return {
     SCHEMA: SCHEMA, STATUS: STATUS, PERFIS: PERFIS, SEED: SEED, CONFIG_PADRAO: CONFIG_PADRAO,
-    handle: handle, instalar: instalar, resolverUrnas: resolverUrnas, completarAptos: completarAptos, normalizarResultadoTse: normalizarResultadoTse,
+    handle: handle, instalar: instalar, executarTseAutomatico: executarTseAutomatico, resolverUrnas: resolverUrnas, completarAptos: completarAptos, normalizarResultadoTse: normalizarResultadoTse,
     sha256: sha256, hmac: hmac, norm: norm, int: int,
     ehTotal: function (l) { return /^TOT-/.test(String(l && l.secao_id || '')); }
   };

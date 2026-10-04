@@ -17,6 +17,7 @@
   App.$$('[data-voltar]').forEach(function (e) { e.innerHTML = ICON.seta; });
   $('#btn-voltar').innerHTML = LEITURA ? '← <span class="oculto-mobile">Voltar aos </span>Resultados' : '← <span class="oculto-mobile">Voltar à </span>Apuração';
   $('#btn-telao-tse').innerHTML = ICON.tv + 'Modo telão';
+  if ($('#btn-rel-final')) $('#btn-rel-final').innerHTML = ICON.impressora + 'Relatório final';
 
   /* ================= LOGIN ================= */
   function telaLogin() {
@@ -41,6 +42,10 @@
     carregar(true);
     clearInterval(timer);
     timer = setInterval(function () { if (!document.hidden) carregar(false); }, (App.CFG.ATUALIZAR_A_CADA_SEGUNDOS || 30) * 1000);
+    // demonstração: sem Apps Script, a própria tela faz o papel do agendamento de 5 minutos
+    if (App.DEMO && !LEITURA) setInterval(function () {
+      if (dados && String(dados.config.tse_auto).toUpperCase() === 'TRUE') chamar('tse.autoAgora').then(function () { carregar(false); }).catch(function () {});
+    }, 5 * 60000);
   }
   document.addEventListener('visibilitychange', function () { if (!document.hidden && sess && dados) carregar(false); });
 
@@ -50,6 +55,7 @@
     return chamar(LEITURA ? 'tse.consulta' : 'tse.dados').then(function (r) {
       if (LEITURA) mostrarBloqueio(false);
       dados = r; calc = Tse.calcular(r);
+      TseAviso.verificar(r);
       if (LEITURA) $('#aviso-parcial').innerHTML = htmlAvisoParcial();
       $('#t-atualizado').lastChild.textContent = 'Atualizado às ' + App.hora(r.agora) + r.agora.substr(16, 3);
       renderTudo();
@@ -86,6 +92,7 @@
     else if (aba === 'aptos') renderAptos();
     else if (aba === 'graficos') renderGraficos();
     else if (aba === 'guia') renderGuia();
+    else if (aba === 'conferencia') renderConferencia();
     else renderHistorico();
   }
 
@@ -164,8 +171,12 @@
       '<div class="chave-linha chave-tse-partido' + (String(cfg.tse_partido_visivel).toUpperCase() === 'TRUE' ? ' on' : '') + '"><div><b>Candidato pode ver o Resultado TSE</b><span>' +
         (String(cfg.tse_partido_visivel).toUpperCase() === 'TRUE' ? '<strong>Liberado:</strong> o acesso do Partido/candidato está vendo a projeção, os eleitos, os gráficos e o telão do TSE.' : '<strong>Bloqueado:</strong> o candidato não vê nada do TSE. Ligue quando a equipe decidir liberar.') +
         '</span></div><label class="switch"><input type="checkbox" id="rs-partido"' + (String(cfg.tse_partido_visivel).toUpperCase() === 'TRUE' ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
+      htmlAutomatico(cfg) +
+      chaveLinha('rs-avisos', 'Avisos de mudança de situação', String(cfg.tse_avisos).toUpperCase() === 'TRUE',
+        '<strong>Ligado:</strong> aparece um aviso discreto no canto da tela (apuração, telão e candidato) quando a situação de ' + h(nomeCand()) + ' muda.',
+        '<strong>Desligado:</strong> nenhum aviso aparece.') +
       '<button class="btn btn-azul btn-xl" id="rs-buscar"' + (tseState.carregando ? ' disabled' : '') + '>' + ICON.atualizar + (tseState.carregando ? 'Buscando no TSE…' : 'Atualizar do TSE') + '</button>' +
-      '<p class="ajuda" style="margin-top:8px">A busca mostra uma prévia. Nada é gravado até você clicar em <strong>Aplicar</strong>.</p></section>';
+      '<p class="ajuda" style="margin-top:8px">A busca manual mostra uma prévia. Nada é gravado até você clicar em <strong>Aplicar</strong>.</p></section>';
 
     if (tseState.erro) html += '<div class="aviso aviso-perigo">' + ICON.alerta + '<div><b>Não foi possível buscar no TSE</b>' + h(tseState.erro) + '</div></div>';
     if (tseState.preview) html += htmlPrevia(tseState.preview);
@@ -186,6 +197,16 @@
     el.innerHTML = html;
 
     $('#rs-buscar', el).onclick = atualizarDoTSE;
+    ligarChave($('#rs-auto', el), 'tse_auto', 'Ligar a atualização automática?', 'O sistema passa a buscar o TSE a cada 5 minutos e aplica sozinho quando houver arquivo novo. O botão manual continua funcionando.', 'Desligar a atualização automática?', 'O sistema para de buscar sozinho. Você pode continuar usando o botão "Atualizar do TSE".');
+    ligarChave($('#rs-avisos', el), 'tse_avisos', 'Ligar os avisos?', 'Um aviso discreto aparece no canto da tela quando a situação do candidato muda (apuração, telão e candidato).', 'Desligar os avisos?', 'Os avisos deixam de aparecer em todas as telas.');
+    var va = $('#rs-verificar', el);
+    if (va) va.onclick = function () {
+      var b = this; App.carregando(b, true, 'Verificando…');
+      chamar('tse.autoAgora').then(function (r) {
+        App.toast(r.mudou ? 'Arquivo novo do TSE aplicado.' : 'Verificado: ' + r.status, r.mudou ? 'ok' : '', 6000);
+        return carregar(true);
+      }).catch(function (e) { App.toast(e.message, 'erro'); App.carregando(b, false); });
+    };
     $('#rs-partido', el).onchange = function () {
       var chk = this, liberar = chk.checked;
       App.confirmar(liberar ? 'Liberar para o candidato?' : 'Bloquear para o candidato?',
@@ -243,10 +264,40 @@
   }
   function descartarPreviaTSE() { tseState = { carregando: false, erro: null, preview: null }; renderResultado(); }
 
+  function chaveLinha(id, titulo, on, txtOn, txtOff) {
+    return '<div class="chave-linha chave-tse-op' + (on ? ' on' : '') + '"><div><b>' + titulo + '</b><span>' + (on ? txtOn : txtOff) + '</span></div>' +
+      '<label class="switch"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '><span class="trilho"></span></label></div>';
+  }
+  function ligarChave(inp, chave, tituloOn, txtOn, tituloOff, txtOff) {
+    if (!inp) return;
+    inp.onchange = function () {
+      var ligar = inp.checked;
+      App.confirmar(ligar ? tituloOn : tituloOff, ligar ? txtOn : txtOff, ligar ? 'Ligar' : 'Desligar', !ligar).then(function (ok) {
+        if (!ok) { inp.checked = !ligar; return; }
+        inp.disabled = true;
+        var v = {}; v[chave] = ligar ? 'TRUE' : 'FALSE';
+        chamar('apuracao.salvarConfig', { valores: v }).then(function () { App.toast(ligar ? 'Ligado.' : 'Desligado.', 'ok'); return carregar(true); })
+          .catch(function (e) { inp.checked = !ligar; inp.disabled = false; App.toast(e.message, 'erro'); });
+      });
+    };
+  }
+  function htmlAutomatico(cfg) {
+    var on = String(cfg.tse_auto).toUpperCase() === 'TRUE', ult = dados.tse_auto_ultima, st = dados.tse_auto_status || '';
+    var atrasado = on && !App.DEMO && (!ult || (Date.now() - msData(ult)) > 12 * 60000);
+    return chaveLinha('rs-auto', 'Atualização automática (a cada 5 minutos)', on,
+      '<strong>Ligada:</strong> o sistema busca o TSE sozinho e aplica quando o arquivo for <strong>mais novo</strong> que o último aplicado. Arquivo igual ou mais antigo é ignorado.',
+      '<strong>Desligada:</strong> os dados só mudam quando alguém clicar em "Atualizar do TSE" e "Aplicar".') +
+      (on || ult ? '<div class="auto-status' + (/^erro/.test(st) ? ' erro' : '') + '"><span>Última verificação: <b>' + (ult ? dataHoraCompleta(ult) : 'nenhuma ainda') + '</b>' + (st ? ' — ' + h(st) : '') + '</span>' +
+        '<button class="btn btn-ghost btn-sm" id="rs-verificar">' + ICON.atualizar + 'Verificar agora</button></div>' : '') +
+      (atrasado ? '<div class="aviso aviso-alerta small" style="margin:-4px 0 14px">' + ICON.alerta + '<div><strong>O agendamento não está rodando.</strong> No Apps Script, escolha a função <strong>instalarAutomatico</strong> e clique em Executar (uma única vez).</div></div>' : '');
+  }
+  function msData(st) { var m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(String(st || '')); return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : 0; }
+
   function modalConfig() {
     var cfg = dados.config;
     var m = App.modal(App.cabecalhoModal('Configurar a Apuração TSE', 'Nome, número e partido do candidato ficam em Apuração → Parâmetros → Geral.') +
-      '<form id="mc-form"><div class="campo"><label for="mc-url">Endereço do resultado do TSE (JSON)</label><input class="input" id="mc-url" value="' + h(cfg.tse_url || '') + '"></div>' +
+      '<form id="mc-form"><div class="campo"><label for="mc-url">Endereço do resultado do TSE — estado (JSON)</label><input class="input" id="mc-url" value="' + h(cfg.tse_url || '') + '"></div>' +
+      '<div class="campo"><label for="mc-url-mun">Endereço do resultado do TSE — Anchieta (JSON)</label><input class="input" id="mc-url-mun" value="' + h(cfg.tse_url_municipio || '') + '"><div class="ajuda">Usado na aba Conferência. Código TSE de Anchieta: 56073.</div></div>' +
       '<div class="campo"><label for="mc-vagas">Vagas em disputa</label><input class="input" id="mc-vagas" inputmode="numeric" maxlength="3" value="' + calc.vagas + '"><div class="ajuda">Assembleia Legislativa do ES: 30 vagas.</div></div>' +
       '<div class="acoes"><button type="button" class="btn btn-sec" data-fechar>Cancelar</button><button class="btn btn-azul" type="submit" id="mc-salvar">Salvar</button></div></form>');
     $('#mc-form', m.el).onsubmit = function (e) {
@@ -254,7 +305,7 @@
       var vagas = valorNumero($('#mc-vagas', m.el).value);
       if (!vagas || Number(vagas) < 1) return App.toast('Informe o número de vagas.', 'erro');
       var b = $('#mc-salvar', m.el); App.carregando(b, true);
-      chamar('apuracao.salvarConfig', { valores: { tse_url: $('#mc-url', m.el).value.trim(), vagas_total: vagas } }).then(function () {
+      chamar('apuracao.salvarConfig', { valores: { tse_url: $('#mc-url', m.el).value.trim(), tse_url_municipio: $('#mc-url-mun', m.el).value.trim(), vagas_total: vagas } }).then(function () {
         App.toast('Configuração salva.', 'ok'); m.fechar(); carregar(true);
       }).catch(function (e2) { App.toast(e2.message, 'erro'); App.carregando(b, false); });
     };
@@ -483,6 +534,125 @@
     if (e.vagasSemCandidato) html += '<p class="tiny muted">Vagas sem candidato acima da cláusula são redistribuídas pela Justiça Eleitoral entre os outros partidos; a projeção não faz essa redistribuição.</p>';
     el.innerHTML = html;
     $$('[data-ev]', el).forEach(function (b) { b.onclick = function () { eleitosVista = b.dataset.ev; renderEleitos(); }; });
+  }
+
+  /* ================= CONFERÊNCIA: nossa apuração × TSE ================= */
+  var apDados = null, conferenciaSecoes = null;
+  function nossaAnchieta() {
+    var cfg = dados.config, mun = Core.norm(cfg.municipio_principal || 'ANCHIETA');
+    var urnas = Core.resolverUrnas(apDados.lancamentos), r = { val: 0, total: 0, urnas: 0, porSecao: {} };
+    Object.keys(urnas).forEach(function (k) {
+      var u = urnas[k]; if (Core.norm(u.municipio) !== mun) return;
+      var v = Number(u.votos) || 0;
+      r.total += v; if (u.status === 'VALIDADO') r.val += v;
+      if (!Core.ehTotal(u)) { r.urnas++; r.porSecao[String(Number(u.secao))] = u; }
+    });
+    var locais = {}; apDados.locais.forEach(function (l) { if (Core.norm(l.municipio) === mun) locais[l.id] = l; });
+    r.secoes = apDados.secoes.filter(function (s) { return s.ativo && locais[s.local_id]; }).map(function (s) { return { numero: String(Number(s.numero)), local: locais[s.local_id].nome }; });
+    return r;
+  }
+  function renderConferencia() {
+    var el = $('#sec-conferencia');
+    if (!apDados) {
+      el.innerHTML = '<div class="card vazio">Carregando a nossa apuração…</div>';
+      chamar('apuracao.dados').then(function (r) { apDados = r; renderConferencia(); }).catch(function (e) { el.innerHTML = '<div class="aviso aviso-perigo">' + ICON.alerta + '<div>' + h(e.message) + '</div></div>'; });
+      return;
+    }
+    var nos = nossaAnchieta(), tm = dados.tse_municipio, nome = nomeCand(), html = '';
+    var pctNos = nos.secoes.length ? nos.urnas / nos.secoes.length * 100 : 0;
+    html += '<section class="card"><div class="card-titulo"><h2>Anchieta: nossa apuração × TSE</h2><div class="botoes-linha"><button class="btn btn-sec btn-sm" id="cf-recarregar">' + ICON.atualizar + 'Atualizar nossa apuração</button>' +
+      '<button class="btn btn-azul btn-sm" id="cf-mun">' + ICON.atualizar + 'Buscar Anchieta no TSE</button></div></div>' +
+      '<p class="muted small" style="margin:-6px 0 14px">Compara os votos de ' + h(nome) + ' em Anchieta: o que os fiscais enviaram (nossa apuração) e o que o TSE divulgou para o município.' +
+      (String(dados.config.tse_auto).toUpperCase() === 'TRUE' ? ' Com a atualização automática ligada, o resultado de Anchieta também é buscado a cada 5 minutos.' : '') + '</p>';
+    if (!tm) html += '<div class="aviso aviso-info">' + ICON.info + '<div>Ainda não buscamos o resultado de Anchieta no TSE. Clique em <strong>Buscar Anchieta no TSE</strong>.</div></div>';
+    else if (!tm.encontrado) html += '<div class="aviso aviso-alerta">' + ICON.alerta + '<div>O arquivo de Anchieta não tem o número ' + h(calc.meuNumero) + '. Confira o endereço em <strong>Resultado TSE → Configurar</strong>.</div></div>';
+    var tseV = tm && tm.encontrado ? tm.votos : null, pctT = tm ? tm.pctSecoes : null;
+    var dif = tseV === null ? null : nos.total - tseV, difVal = tseV === null ? null : nos.val - tseV;
+    var completo = pctT !== null && pctT >= 100 && pctNos >= 100;
+    html += '<div class="kpis">' +
+      '<div class="kpi"><div class="rot">Nossa apuração</div><div class="val num">' + n(nos.total) + '</div><div class="det">' + n(nos.val) + ' confirmados · ' + nos.urnas + ' de ' + nos.secoes.length + ' urnas (' + pctNos.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%)</div></div>' +
+      '<div class="kpi destaque"><div class="rot">TSE · Anchieta</div><div class="val num">' + (tseV === null ? '—' : n(tseV)) + '</div><div class="det">' + (tm ? (pctT !== null ? pctT.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '% das seções' : h(tm.situacao || '')) + (tm.atualizadoEm ? ' · arquivo de ' + h(tm.atualizadoEm) : '') : 'não buscado') + '</div></div>' +
+      '<div class="kpi"><div class="rot">Diferença</div><div class="val num" style="color:' + (dif === null ? 'inherit' : dif === 0 ? 'var(--ok)' : '#b34700') + '">' + (dif === null ? '—' : (dif > 0 ? '+' : '') + n(dif)) + '</div><div class="det">nossa (com em conferência) − TSE</div></div>' +
+      '<div class="kpi"><div class="rot">Só confirmados</div><div class="val num">' + (difVal === null ? '—' : (difVal > 0 ? '+' : '') + n(difVal)) + '</div><div class="det">confirmados − TSE</div></div></div>';
+    if (tseV !== null) html += completo
+      ? (dif === 0 ? '<div class="aviso aviso-info">' + ICON.check + '<div><b>Os números batem.</b>Com 100% das urnas nas duas apurações, o total de Anchieta é igual ao do TSE.</div></div>'
+        : '<div class="aviso aviso-perigo">' + ICON.alerta + '<div><b>Diferença de ' + n(Math.abs(dif)) + ' votos com 100% apurado.</b>Use a conferência seção por seção (abaixo) para achar onde está a diferença.</div></div>')
+      : '<div class="aviso aviso-alerta">' + ICON.info + '<div><b>Comparação parcial.</b>A diferença só é definitiva quando as duas apurações chegarem a 100% das urnas — até lá, cada lado pode ter urnas que o outro ainda não contou.</div></div>';
+    html += '</section>';
+
+    // seção por seção (dados abertos do TSE, depois da eleição)
+    html += '<section class="card"><div class="card-titulo"><h2>Conferência seção por seção</h2><span class="muted tiny">depois da eleição</span></div>' +
+      '<p class="muted small" style="margin:-6px 0 12px">Após a eleição, o TSE publica a votação de cada seção no Portal de Dados Abertos (<b>dadosabertos.tse.jus.br</b> → "Resultados 2026" → <b>Votação por seção eleitoral</b>, arquivo do ES). ' +
+      'Baixe, descompacte e escolha o arquivo <b>.csv</b> abaixo. O sistema separa só Anchieta e o número ' + h(calc.meuNumero) + ' e compara com o que os fiscais enviaram. O arquivo é lido no seu computador — nada é enviado.</p>' +
+      '<label class="btn btn-sec" style="cursor:pointer">' + ICON.upload + 'Escolher arquivo CSV do TSE<input type="file" id="cf-csv" accept=".csv,text/csv" hidden></label> <span class="small muted" id="cf-prog"></span>' +
+      '<div id="cf-res">' + (conferenciaSecoes ? htmlConferenciaSecoes(nos) : '') + '</div></section>';
+    el.innerHTML = html;
+    $('#cf-recarregar', el).onclick = function () { apDados = null; renderConferencia(); };
+    $('#cf-mun', el).onclick = function () {
+      var b = this; App.carregando(b, true, 'Buscando…');
+      chamar('tse.municipio').then(function () { return carregar(true); }).then(function () { App.toast('Resultado de Anchieta atualizado.', 'ok'); })
+        .catch(function (e) { App.toast(e.message, 'erro', 7000); App.carregando(b, false); });
+    };
+    $('#cf-csv', el).onchange = function () { if (this.files[0]) lerCsvTse(this.files[0]); };
+  }
+  /* lê o CSV de "votação por seção" do TSE em pedaços (o arquivo do estado é grande) */
+  function lerCsvTse(arq) {
+    var prog = $('#cf-prog'), num = calc.meuNumero, achados = {}, idx = null, resto = '', lidos = 0, linhas = 0, total = arq.size;
+    var dec = new TextDecoder('windows-1252'), reader = arq.stream().getReader();
+    var munAlvo = Core.norm(dados.config.municipio_principal || 'ANCHIETA');
+    function campos(l) { return l.split(';').map(function (x) { return x.replace(/^"|"$/g, '').trim(); }); }
+    function linha(l) {
+      if (!l) return;
+      var c = campos(l);
+      if (!idx) { idx = {}; c.forEach(function (k, i) { idx[k.toUpperCase()] = i; }); return; }
+      linhas++;
+      var mun = Core.norm(c[idx.NM_MUNICIPIO]), cod = c[idx.CD_MUNICIPIO];
+      if (mun !== munAlvo && cod !== '56073') return;
+      if (String(c[idx.NR_VOTAVEL]) !== num) return;
+      if (idx.DS_CARGO !== undefined && !/ESTADUAL/.test(Core.norm(c[idx.DS_CARGO]))) return;
+      var sec = String(Number(c[idx.NR_SECAO]));
+      achados[sec] = (achados[sec] || 0) + (Number(c[idx.QT_VOTOS]) || 0);
+    }
+    function passo() {
+      return reader.read().then(function (r) {
+        if (r.done) { linha(resto); return fim(); }
+        lidos += r.value.length;
+        var txt = resto + dec.decode(r.value, { stream: true }), partes = txt.split(/\r?\n/);
+        resto = partes.pop(); partes.forEach(linha);
+        prog.textContent = 'Lendo… ' + Math.round(lidos / total * 100) + '%';
+        return passo();
+      });
+    }
+    function fim() {
+      if (!idx || idx.NR_SECAO === undefined || idx.QT_VOTOS === undefined || idx.NR_VOTAVEL === undefined) { prog.textContent = ''; return App.toast('Esse arquivo não parece ser a "votação por seção" do TSE (faltam as colunas NR_SECAO, NR_VOTAVEL e QT_VOTOS).', 'erro', 8000); }
+      conferenciaSecoes = achados;
+      prog.textContent = n(linhas) + ' linhas lidas · ' + Object.keys(achados).length + ' seções de Anchieta com votos de ' + nomeCand() + '.';
+      $('#cf-res').innerHTML = htmlConferenciaSecoes(nossaAnchieta());
+    }
+    prog.textContent = 'Lendo… 0%';
+    passo().catch(function (e) { prog.textContent = ''; App.toast('Não foi possível ler o arquivo: ' + e.message, 'erro'); });
+  }
+  function htmlConferenciaSecoes(nos) {
+    var tse = conferenciaSecoes, linhas = [], cont = { iguais: 0, dif: 0, semNosso: 0 };
+    nos.secoes.slice().sort(function (a, b) { return a.numero - b.numero; }).forEach(function (s) {
+      var u = nos.porSecao[s.numero], t = tse[s.numero] !== undefined ? tse[s.numero] : 0, v = u ? Number(u.votos) || 0 : null;
+      var tipo = v === null ? 'sem' : v === t ? 'ok' : 'dif';
+      if (tipo === 'ok') cont.iguais++; else if (tipo === 'dif') cont.dif++; else cont.semNosso++;
+      linhas.push({ s: s, u: u, v: v, t: t, tipo: tipo });
+    });
+    linhas.sort(function (a, b) { var o = { dif: 0, sem: 1, ok: 2 }; return o[a.tipo] - o[b.tipo] || a.s.numero - b.s.numero; });
+    return '<div class="kpis" style="margin-top:16px">' +
+      '<div class="kpi"><div class="rot">Seções iguais</div><div class="val num" style="color:var(--ok)">' + cont.iguais + '</div><div class="det">nossa = TSE</div></div>' +
+      '<div class="kpi"><div class="rot">Com diferença</div><div class="val num" style="color:' + (cont.dif ? 'var(--perigo)' : 'inherit') + '">' + cont.dif + '</div><div class="det">conferir a foto do BU</div></div>' +
+      '<div class="kpi"><div class="rot">Sem envio nosso</div><div class="val num">' + cont.semNosso + '</div><div class="det">o fiscal não enviou</div></div>' +
+      '<div class="kpi"><div class="rot">Total TSE (Anchieta)</div><div class="val num">' + n(Object.keys(tse).reduce(function (a, k) { return a + tse[k]; }, 0)) + '</div><div class="det">somando as seções do arquivo</div></div></div>' +
+      '<div class="tabela-wrap"><table class="tabela responsiva"><thead><tr><th class="r">Seção</th><th>Local</th><th class="r">Nossa</th><th class="r">TSE</th><th class="r">Diferença</th><th>Situação</th></tr></thead><tbody>' +
+      linhas.map(function (x) {
+        return '<tr' + (x.tipo === 'dif' ? ' class="linha-dif"' : '') + '><td data-l="Seção" class="r"><b>' + h(x.s.numero) + '</b></td><td data-l="Local">' + h(x.s.local) + '</td>' +
+          '<td data-l="Nossa" class="r">' + (x.v === null ? '—' : n(x.v) + (x.u && x.u.status !== 'VALIDADO' ? ' <span class="tiny muted">(em conferência)</span>' : '')) + '</td><td data-l="TSE" class="r">' + n(x.t) + '</td>' +
+          '<td data-l="Diferença" class="r">' + (x.v === null ? '—' : (x.v - x.t > 0 ? '+' : '') + n(x.v - x.t)) + '</td>' +
+          '<td data-l="Situação">' + (x.tipo === 'ok' ? '<span class="selo selo-ENVIADO">igual</span>' : x.tipo === 'dif' ? '<span class="selo selo-REJEITADO">diferente</span>' : '<span class="selo selo-DESCARTADO">sem envio</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
   }
 
   /* ================= 3. CANDIDATOS APTOS (busca) ================= */

@@ -41,6 +41,12 @@
     App.sessao.sair(AREA); sess = null; clearInterval(timer); location.href = './';
   });
 
+  var cfgAtual = null;
+  // aviso discreto quando a situação no Resultado TSE muda (só se a apuração ligou os avisos e liberou o TSE)
+  TseAviso.monitorar(function () {
+    return sess && cfgAtual && String(cfgAtual.tse_avisos).toUpperCase() === 'TRUE' && String(cfgAtual.tse_partido_visivel).toUpperCase() === 'TRUE';
+  }, function () { return App.api('tse.consulta', { token: sess.token }); }, 60);
+
   function iniciar() {
     $('#tela-login').hidden = true; $('#tela-app').hidden = false; window.scrollTo(0, 0);
     if (!painel) painel = Painel.criar($('#sec-painel'), { modo: 'partido' });
@@ -55,6 +61,7 @@
     ocupado = true;
     App.api('partido.dados', { token: sess.token }).then(function (r) {
       painel.atualizar(r);
+      cfgAtual = r.config;
       ajustarBotaoTse(String(r.config.tse_partido_visivel).toUpperCase() === 'TRUE');
       $('#t-titulo').textContent = (r.config.candidato_nome || 'Fabricio Petri') + ' ' + (r.config.candidato_numero || '');
       var at = $('#t-atualizado'); at.classList.remove('off'); at.lastChild.textContent = App.hora(r.agora) + r.agora.substr(16, 3);
