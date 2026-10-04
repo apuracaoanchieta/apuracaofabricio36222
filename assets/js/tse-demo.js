@@ -22,7 +22,7 @@ window.TseDemo = (function () {
     });
     return {
       dg: new Date().toLocaleDateString('pt-BR'), hg: new Date().toLocaleTimeString('pt-BR'),
-      snt: Math.round((1 - p) * 9300),
+      snt: Math.round((1 - p) * 9300), pst: (p * 100).toFixed(2).replace('.', ','), ts: 9300,
       carg: [{ agr: ordem.map(function (ka) {
         var a = agrs[ka];
         return { nm: a.nm, par: a.ordem.map(function (sg) {

@@ -180,6 +180,63 @@ var Tse = (function () {
     return null;
   }
 
+  /* ---------- Quanto falta para eleger ----------
+   * Simula votos a mais e refaz o cálculo completo (quociente, sobras e cláusula).
+   * Os votos dos adversários ficam como estão no resultado atual do TSE. */
+  function simularStatus(calc, ajustes, extraNosso) {
+    var soma = 0;
+    var oficial = calc.oficial.map(function (p) { var x = ajustes[p.chave] || 0; soma += x; return Object.assign({}, p, { votos: p.votos + x }); });
+    var cands = calc.doPartido.map(function (c) { return c.ehNosso && extraNosso ? Object.assign({}, c, { votos: c.votos + extraNosso }) : c; });
+    return statusCandidato(calc.votosValidos + soma, calc.vagas, calc.grupoNosso.chave, oficial, cands);
+  }
+  function menorX(teste, max) {
+    if (teste(0)) return 0;
+    if (!teste(max)) return null;
+    var lo = 0, hi = max;
+    while (hi - lo > 1) { var meio = Math.floor((lo + hi) / 2); if (teste(meio)) hi = meio; else lo = meio; }
+    return hi;
+  }
+  function ajuste(chave, x) { var o = {}; o[chave] = x; return o; }
+  function quantoFalta(calc, pctSecoes) {
+    var st = calc.st;
+    if (st.kind !== 'com-dados' || !st.nosso || !calc.votosValidos) return null;
+    var nosso = st.nosso, chave = calc.grupoNosso.chave, max = Math.max(1000, calc.votosValidos * 2);
+    var r = { eleito: nosso.eleito, votos: nosso.votos, QE: st.QE, posicao: st.candidatos.indexOf(nosso) + 1, vagasPartido: st.vagasDoPartido };
+    r.paraClausula = nosso.passaClausula ? 0 : Math.max(1, Math.ceil(st.QE * 0.1) - nosso.votos);
+
+    // 1) votos do candidato (que também somam para o partido) até entrar
+    r.paraEleger = nosso.eleito ? 0 : menorX(function (x) { var s = simularStatus(calc, ajuste(chave, x), x); return !!(s.nosso && s.nosso.eleito); }, max);
+    // 2) votos a mais para o partido ganhar mais uma vaga (e de quem ela sairia)
+    r.paraMaisVaga = menorX(function (x) { return simularStatus(calc, ajuste(chave, x), 0).vagasDoPartido > st.vagasDoPartido; }, max);
+    if (r.paraMaisVaga !== null) {
+      var antes = {}; st.dist.resultado.forEach(function (x) { antes[x.chave] = x.vagasTotal; });
+      simularStatus(calc, ajuste(chave, r.paraMaisVaga), 0).dist.resultado.forEach(function (x) { if (x.chave !== chave && x.vagasTotal < antes[x.chave]) r.vagaSairiaDe = x.nome; });
+    }
+    // 3) distância para o último eleito do partido
+    var eleitos = st.candidatos.filter(function (c) { return c.eleito; });
+    var ultimo = eleitos[eleitos.length - 1];
+    if (!nosso.eleito && ultimo) r.ultimoEleito = { nome: ultimo.nome, votos: ultimo.votos, falta: ultimo.votos - nosso.votos + 1 };
+    // 4) margem de segurança (se já está eleito)
+    if (nosso.eleito) {
+      var prox = st.candidatos.filter(function (c) { return !c.eleito; })[0];
+      if (prox) r.proximoColega = { nome: prox.nome, votos: prox.votos, margem: nosso.votos - prox.votos };
+      var ameaca = null;
+      calc.oficial.forEach(function (p) {
+        if (p.chave === chave || !p.votos) return;
+        var x = menorX(function (v) { var s = simularStatus(calc, ajuste(p.chave, v), 0); return !(s.nosso && s.nosso.eleito); }, max);
+        if (x !== null && (!ameaca || x < ameaca.falta)) ameaca = { nome: p.nome, falta: x };
+      });
+      r.ameacaPartido = ameaca;
+    }
+    // estimativa para o fim da apuração: todos no mesmo ritmo até 100% das seções
+    var p = Number(pctSecoes);
+    if (isFinite(p) && p > 0 && p < 100) {
+      var f = p / 100;
+      r.final = { pct: p, votosProjetados: Math.round(nosso.votos / f), precisaTerminarCom: r.paraEleger !== null && !nosso.eleito ? Math.round((nosso.votos + r.paraEleger) / f) : null };
+    }
+    return r;
+  }
+
   /* ---------- Lista de candidatos aptos (busca) ---------- */
   function candidatosTseDoPartido(nomePartido, listaCandidatosTse) {
     var alvo = grupoDe(nomePartido).chave;
@@ -247,7 +304,7 @@ var Tse = (function () {
     VAGAS_PADRAO: VAGAS_PADRAO, LABEL_MARCO: LABEL_MARCO,
     grupoDe: grupoDe, agruparPartidos: agruparPartidos, rotuloFederacao: rotuloFederacao,
     calcularDistribuicao: calcularDistribuicao, aplicarClausulaDesempenho: aplicarClausulaDesempenho,
-    statusCandidato: statusCandidato, classificarStatus: classificarStatus, calcular: calcular, eleitosProjetados: eleitosProjetados, situacaoOficial: situacaoOficial,
+    statusCandidato: statusCandidato, classificarStatus: classificarStatus, calcular: calcular, eleitosProjetados: eleitosProjetados, situacaoOficial: situacaoOficial, quantoFalta: quantoFalta, simularStatus: simularStatus,
     candidatosTseDoPartido: candidatosTseDoPartido, candidatosTseFiltrados: candidatosTseFiltrados,
     montarPontoHistorico: montarPontoHistorico, marcosDoHistorico: marcosDoHistorico,
     dadosVagasPorPartido: dadosVagasPorPartido, dadosDistribuicaoVotos: dadosDistribuicaoVotos, dadosEvolucao: dadosEvolucao

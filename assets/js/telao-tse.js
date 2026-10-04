@@ -95,6 +95,9 @@
       ? 'O ' + h(partido) + ' faz <b>' + st.vagasDoPartido + ' vaga' + (st.vagasDoPartido === 1 ? '' : 's') + '</b> de ' + c.vagas +
         ' · cláusula: ' + n(Math.ceil(st.QE * 0.1)) + ' votos'
       : 'sem votos por partido';
+    var qf = Tse.quantoFalta(c, d.tse_pct_secoes);
+    if (qf && !qf.eleito && qf.paraEleger !== null) $('#t-proj-txt').innerHTML += '<br>Faltam <b class="t-falta">' + n(qf.paraEleger) + '</b> votos para entrar';
+    else if (qf && qf.eleito && qf.proximoColega) $('#t-proj-txt').innerHTML += '<br>Vantagem de <b class="t-falta">' + n(qf.proximoColega.margem) + '</b> votos no ' + h(partido);
 
     // ranking do partido (o candidato sempre aparece)
     $('#t-rot-ranking').textContent = 'CANDIDATOS DO ' + partido + ' · ' + (st.kind === 'com-dados' ? st.vagasDoPartido + ' VAGA' + (st.vagasDoPartido === 1 ? '' : 'S') : 'SEM PROJEÇÃO');

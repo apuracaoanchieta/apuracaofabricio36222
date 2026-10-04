@@ -168,3 +168,4 @@
 .t-eleitos-cab .t-rot { white-space: nowrap; }
 .t-el-resumo { text-align: right; }
 @media (orientation: portrait) { .t-eleitos-cab { flex-wrap: wrap; } .t-el-resumo { text-align: left; } }
+.telao-tse .t-falta { color: #ffd36b !important; font-size: 1.25em; }

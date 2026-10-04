@@ -48,9 +48,10 @@ var Core = (function () {
     ['tse_atualizado_em', '', 'Data/hora do último resultado aplicado do TSE (automático)'],
     ['tse_situacao', '', 'Situação da totalização no último resultado do TSE (automático)'],
     ['tse_aplicado_em', '', 'Quando o último resultado do TSE foi aplicado no sistema (automático)'],
-    ['tse_aplicado_por', '', 'Quem aplicou o último resultado do TSE (automático)']
+    ['tse_aplicado_por', '', 'Quem aplicou o último resultado do TSE (automático)'],
+    ['tse_pct_secoes', '', '% de seções totalizadas no último resultado do TSE (automático)']
   ];
-  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true, tse_aplicado_em: true, tse_aplicado_por: true };
+  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true, tse_aplicado_em: true, tse_aplicado_por: true, tse_pct_secoes: true };
 
   /* Locais e seções de Anchieta — Zona 17 (relação 2026) */
   var SEED = [
@@ -909,9 +910,24 @@ var Core = (function () {
     partidos = partidos.filter(function (p) { return p.sigla; });
     if (!candidatos.length && !partidos.length) throw erro('Não consegui reconhecer nenhum candidato/partido no arquivo do TSE.');
     var secoesNaoTotalizadas = raw.snt != null ? raw.snt : (raw.perst != null ? raw.perst : null);
+    // % de seções totalizadas (usado na estimativa para o fim da apuração)
+    var numBr = function (v) {
+      if (v === null || v === undefined || v === '') return null;
+      var t = String(v).trim(); if (t.indexOf(',') >= 0) t = t.replace(/\./g, '').replace(',', '.');
+      var x = Number(t); return isFinite(x) ? x : null;
+    };
+    var sec = raw.s || {};
+    var pst = numBr(raw.pst != null ? raw.pst : sec.pst), ts = numBr(raw.ts != null ? raw.ts : sec.ts);
+    var stt = numBr(sec.st), snt = numBr(secoesNaoTotalizadas);
+    var pct = pst !== null ? pst : (ts ? (stt !== null ? stt / ts * 100 : (snt !== null ? (ts - snt) / ts * 100 : null)) : null);
+    if (pct === null && snt === 0) pct = 100;
+    if (pct !== null) pct = Math.max(0, Math.min(100, pct));
+    var textoSit = pct !== null ? (pct >= 100 ? 'totalização final' : pct.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '% das seções totalizadas')
+      : (secoesNaoTotalizadas != null ? secoesNaoTotalizadas + ' seção(ões) ainda não totalizada(s)' : '');
     return {
       atualizadoEm: raw.dg && raw.hg ? (raw.dg + ' ' + raw.hg) : '',
-      secoesTotalizadas: raw.pst || (secoesNaoTotalizadas != null ? (Number(secoesNaoTotalizadas) === 0 ? 'totalização final' : secoesNaoTotalizadas + ' seção(ões) ainda não totalizada(s)') : ''),
+      secoesTotalizadas: textoSit,
+      pctSecoes: pct,
       candidatos: candidatos,
       partidos: partidos
     };
@@ -925,6 +941,7 @@ var Core = (function () {
     return {
       config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
       tse_aplicado_em: str(cfg.tse_aplicado_em), tse_aplicado_por: str(cfg.tse_aplicado_por),
+      tse_pct_secoes: str(cfg.tse_pct_secoes) === '' ? null : Number(cfg.tse_pct_secoes),
       partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
       historico: mapTseHistorico(db).map(strip), agora: db.stamp()
     };
@@ -973,6 +990,8 @@ var Core = (function () {
       gravarConfigInterna(db, 'tse_atualizado_em', str(req.atualizadoEm).substr(0, 40) || agora);
       gravarConfigInterna(db, 'tse_situacao', str(req.secoesTotalizadas).substr(0, 80));
       gravarConfigInterna(db, 'tse_aplicado_em', agora);
+      var pctS = Number(req.pctSecoes);
+      gravarConfigInterna(db, 'tse_pct_secoes', req.pctSecoes === null || req.pctSecoes === undefined || req.pctSecoes === '' || !isFinite(pctS) ? '' : String(Math.max(0, Math.min(100, pctS))));
       gravarConfigInterna(db, 'tse_aplicado_por', u.usuario);
       log(db, u.usuario, 'TSE_APLICAR', partidos.length + ' partidos, ' + candidatos.length + ' candidatos');
       return { partidos: ordemP.length, candidatos: ordemC.length };

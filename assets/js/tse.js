@@ -158,7 +158,7 @@
   function aplicarPreviaTSE() {
     var pv = tseState.preview; if (!pv) return;
     var b = $('#rs-aplicar'); App.carregando(b, true, 'Aplicando…');
-    chamar('tse.aplicar', { partidos: pv.partidos, candidatos: pv.candidatos, atualizadoEm: pv.atualizadoEm, secoesTotalizadas: pv.secoesTotalizadas }).then(function (r) {
+    chamar('tse.aplicar', { partidos: pv.partidos, candidatos: pv.candidatos, atualizadoEm: pv.atualizadoEm, secoesTotalizadas: pv.secoesTotalizadas, pctSecoes: pv.pctSecoes }).then(function (r) {
       tseState = { carregando: false, erro: null, preview: null };
       App.toast('Resultado aplicado: ' + r.partidos + ' partidos e ' + n(r.candidatos) + ' candidatos.', 'ok', 5000);
       return carregar(true).then(function () { return registrarSnapshot(false); });
@@ -227,6 +227,8 @@
       '<div class="kpi destaque"><div class="rot">' + h(nomeCand()) + '</div><div class="val num">' + (nosso ? n(votosNosso) : '—') + '</div><div class="det">' +
         (nosso ? pctFrac(st.QE ? votosNosso / st.QE : 0) + ' do quociente eleitoral' : 'candidato não cadastrado') + '</div></div></div>';
 
+    html += htmlQuantoFalta();
+
     // medidor % do QE com a marca da cláusula (10%)
     var pctQE = st.QE > 0 ? votosNosso / st.QE : 0, fill = Math.max(0, Math.min(100, pctQE * 100));
     var corMedidor = s.classe === 'ok' ? 'var(--ok)' : s.classe === 'warn' ? 'var(--laranja)' : s.classe === 'danger' ? 'var(--perigo)' : 'var(--texto-3)';
@@ -253,6 +255,38 @@
     html += htmlCandidatosPartido(st);
     el.innerHTML = html;
     ligarCandidatos(el);
+  }
+  function htmlQuantoFalta() {
+    var r = Tse.quantoFalta(calc, dados.tse_pct_secoes), nome = nomeCand(), partido = calc.grupoNosso.nome;
+    if (!r) return '';
+    var linha = function (rot, val, det) { return '<div class="linha"><span>' + rot + (det ? '<small class="tiny muted" style="display:block;font-weight:500">' + det + '</small>' : '') + '</span><b>' + val + '</b></div>'; };
+    var votos = function (x) { return x === null || x === undefined ? 'fora de alcance' : n(x) + ' voto' + (x === 1 ? '' : 's'); };
+    var html = '<section class="card quanto-falta' + (r.eleito ? ' ok' : '') + '"><div class="card-titulo"><h3>Quanto falta para eleger</h3><span class="muted tiny">simulação com o resultado atual do TSE</span></div>';
+    if (!r.eleito) {
+      html += '<div class="qf-destaque"><span>Faltam</span><b class="num">' + (r.paraEleger === null ? '—' : n(r.paraEleger)) + '</b><span>votos para ' + h(nome) + ' entrar na projeção de eleitos</span></div>' +
+        '<p class="muted small" style="margin:0 0 14px">Conta que os votos dele também somam para o ' + h(partido) + ' (mudam o quociente e as sobras). Os adversários ficam como estão.</p>';
+      html += '<div class="resumo-envio">' +
+        (r.ultimoEleito ? linha('Para passar ' + h(r.ultimoEleito.nome), votos(r.ultimoEleito.falta), 'último eleito do ' + h(partido) + ' · ' + n(r.ultimoEleito.votos) + ' votos') : '') +
+        linha('Para o ' + h(partido) + ' ganhar mais uma vaga', votos(r.paraMaisVaga), r.vagaSairiaDe ? 'a vaga sairia do ' + h(r.vagaSairiaDe) + ' · votos de legenda ou de qualquer candidato do partido' : 'votos de legenda ou de qualquer candidato do partido') +
+        linha('Para alcançar a cláusula (10% do QE)', r.paraClausula ? votos(r.paraClausula) : 'já alcançou', 'mínimo de ' + n(Math.ceil(r.QE * 0.1)) + ' votos') +
+        '</div>';
+    } else {
+      var margens = [];
+      if (r.proximoColega) margens.push(r.proximoColega.margem);
+      if (r.ameacaPartido) margens.push(r.ameacaPartido.falta);
+      var margem = margens.length ? Math.min.apply(null, margens) : null;
+      html += '<div class="qf-destaque"><span>Eleito na projeção' + (margem !== null ? ' · margem de' : '') + '</span><b class="num">' + (margem !== null ? n(margem) : '✓') + '</b><span>' + (margem !== null ? 'votos de vantagem no ponto mais apertado' : '') + '</span></div>';
+      html += '<div class="resumo-envio">' +
+        (r.proximoColega ? linha('Vantagem sobre ' + h(r.proximoColega.nome), votos(r.proximoColega.margem), 'primeiro do ' + h(partido) + ' fora das vagas · ' + n(r.proximoColega.votos) + ' votos') : '') +
+        linha('Para tirar a vaga dele', r.ameacaPartido ? votos(r.ameacaPartido.falta) + ' do ' + h(r.ameacaPartido.nome) : 'vaga segura', 'partido adversário que chegaria mais perto') +
+        linha('Para o ' + h(partido) + ' ganhar mais uma vaga', votos(r.paraMaisVaga), r.vagaSairiaDe ? 'a vaga sairia do ' + h(r.vagaSairiaDe) : '') +
+        '</div>';
+    }
+    if (r.final) {
+      html += '<div class="aviso aviso-info" style="margin:14px 0 0">' + ICON.info + '<div><b>Estimativa para o fim da apuração</b>Com ' + r.final.pct.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) + '% das seções totalizadas e todos mantendo o ritmo, ' + h(nome) + ' terminaria com cerca de <strong>' + n(r.final.votosProjetados) + ' votos</strong>' +
+        (r.final.precisaTerminarCom ? ' e precisaria terminar com cerca de <strong>' + n(r.final.precisaTerminarCom) + '</strong> para ser eleito.' : '.') + '</div></div>';
+    }
+    return html + '</section>';
   }
   function textoStatus(st, s) {
     if (s.chave === 'sem-dados') return 'Sem votos por partido para projetar as vagas.';
