@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <meta name="robots" content="noindex">
+  <title>Telão TSE — Fabricio Petri 36.222</title>
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/telao.css">
+</head>
+<body class="pg-telao">
+  <!-- Login -->
+  <div id="tela-login" class="login-pg" hidden>
+    <header class="hero">
+      <a class="voltar" href="tse.html" aria-label="Voltar à Apuração TSE"><span data-voltar></span>Apuração TSE</a>
+      <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+      <p class="sub">Telão da Apuração TSE</p>
+    </header>
+    <form class="card login-card" id="form-login">
+      <h1>Digite a senha</h1>
+      <p class="muted small" style="margin:0 0 18px">Senha da Apuração.</p>
+      <div class="campo"><label for="l-senha">Senha de acesso</label>
+        <input class="input" id="l-senha" type="password" autocomplete="current-password" required></div>
+      <div id="l-demo" class="aviso aviso-info small" hidden></div>
+      <button class="btn btn-primario btn-xl" type="submit" id="l-entrar">Abrir telão</button>
+    </form>
+  </div>
+
+  <!-- Telão TSE -->
+  <main id="telao" class="telao telao-tse" hidden>
+    <header class="t-topo">
+      <img class="t-logo" src="assets/img/logo-480.png" alt="Fabricio Petri 36.222" width="480" height="410">
+      <div class="t-titulo">
+        <div class="t-aovivo"><span class="t-ponto"></span>RESULTADO OFICIAL · TSE</div>
+        <div class="t-mun">ESPÍRITO SANTO</div>
+      </div>
+      <div class="t-hora"><b id="t-hora">--:--</b><span id="t-atualizado">atualizando…</span></div>
+    </header>
+
+    <section class="t-principal">
+      <div class="t-votos">
+        <div class="t-rot" id="t-rot-votos">VOTOS NO ESTADO</div>
+        <div class="t-numero num" id="t-votos">0</div>
+        <div class="t-sub" id="t-sub"></div>
+      </div>
+      <div class="t-urnas">
+        <div class="t-rot">PROJEÇÃO</div>
+        <div class="t-status" id="t-status">—</div>
+        <div class="t-medidor"><i id="t-med"></i><span class="t-marca" title="Cláusula: 10% do quociente"></span></div>
+        <div class="t-sub" id="t-proj-txt"></div>
+      </div>
+    </section>
+
+    <section class="t-locais">
+      <div class="t-rot" id="t-rot-ranking">CANDIDATOS DO PARTIDO</div>
+      <ol id="t-ranking"></ol>
+    </section>
+
+    <footer class="t-rodape">
+      <span id="t-numeros"></span>
+      <span class="t-legenda"><i class="v"></i>dentro das vagas <i class="c"></i>passa da cláusula <i class="x"></i>abaixo da cláusula</span>
+      <span class="t-credito">Desenvolvido por <b>DERYCK NOGUEIRA</b></span>
+    </footer>
+
+    <div class="t-controles" id="t-controles">
+      <button type="button" id="t-voltar" class="t-voltar">← Voltar</button>
+      <button type="button" id="t-cheia">Tela cheia</button>
+      <a href="./" id="t-sair">Início</a>
+    </div>
+  </main>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/candidatos-tse-es2026.js"></script>
+  <script src="assets/js/tse-demo.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/tse-logica.js"></script>
+  <script src="assets/js/telao-tse.js"></script>
+</body>
+</html>
