@@ -1,0 +1,181 @@
+/* ===== Modo telão (TV do comitê) — tudo em unidades de tela ===== */
+.pg-telao { background: #01607a; overflow: hidden; }
+.telao {
+  position: fixed; inset: 0; color: #fff; display: grid; overflow: hidden; isolation: isolate;
+  grid-template-rows: auto 1fr auto auto; gap: 2.2vh; padding: 2.6vh 3vw 2.4vh;
+  background: radial-gradient(120% 90% at 100% 100%, #0089b8 0%, #019fc6 45%, #02a9d1 100%);
+  font-family: var(--fonte);
+}
+.telao::before {
+  content: ''; position: absolute; z-index: -1; width: 62vw; height: 62vw; border-radius: 50%; left: -24vw; top: -36vw;
+  background: radial-gradient(circle at 58% 64%, #f9b400 0%, #f6a800 40%, #ef8a00 80%, #ec7f00 100%);
+  box-shadow: 0 0 120px rgba(0, 0, 0, .12);
+}
+.telao[hidden] { display: none; }
+
+.t-topo { display: flex; align-items: center; gap: 2vw; }
+.t-logo { height: 12vh; width: auto; filter: drop-shadow(0 1vh 2vh rgba(0, 40, 70, .3)); }
+.t-titulo { flex: 1; min-width: 0; }
+.t-aovivo { display: inline-flex; align-items: center; gap: .8vw; font-weight: 800; letter-spacing: .25vw; font-size: clamp(14px, 1.9vh, 30px);
+  background: rgba(10, 53, 80, .35); padding: .8vh 1.2vw; border-radius: 99px; }
+.t-ponto { width: 1.4vh; height: 1.4vh; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 0 rgba(255, 77, 77, .7); animation: tpulso 1.6s infinite; }
+.telao.off .t-ponto { background: #ffd2c9; animation: none; }
+@keyframes tpulso { 70% { box-shadow: 0 0 0 1.4vh rgba(255, 77, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); } }
+.t-mun { font-size: clamp(22px, 4.6vh, 64px); font-weight: 900; letter-spacing: .1vw; margin-top: .6vh; text-shadow: 0 .4vh 1.6vh rgba(0, 50, 80, .35); }
+.t-hora { text-align: right; }
+.t-hora b { display: block; font-size: clamp(22px, 5vh, 70px); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.t-hora span { font-size: clamp(11px, 1.6vh, 22px); font-weight: 600; opacity: .9; }
+.t-hora .tse-contador.tc-telao { display: block; margin: .6vh 0 0 auto; padding: 0; border: 0; border-radius: 0; background: none; color: inherit; min-height: 0; text-align: right; }
+.t-hora .tse-contador.tc-telao .tc-txt { font-size: clamp(10px, 1.4vh, 19px); opacity: .85; }
+.t-hora .tse-contador.tc-telao b { display: inline; font-size: inherit; line-height: inherit; color: inherit; }
+.t-hora .tse-contador.tc-telao i { display: none; }
+.t-hora .tse-contador[hidden] { display: none; }
+
+.t-principal { display: grid; grid-template-columns: 1.55fr 1fr; gap: 2.4vw; min-height: 0; }
+.t-votos, .t-urnas, .t-locais {
+  background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); border-radius: 3vh;
+  backdrop-filter: blur(6px); padding: 3vh 2.6vw; min-width: 0; display: flex; flex-direction: column; justify-content: center;
+}
+.t-votos { background: #fff; color: var(--texto); box-shadow: 0 2vh 5vh rgba(0, 40, 70, .25); border: 0; }
+.t-rot { font-size: clamp(12px, 2vh, 28px); font-weight: 800; letter-spacing: .3vw; opacity: .9; }
+.t-votos .t-rot { color: var(--azul-esc); }
+.t-numero { font-size: clamp(60px, 22vh, 300px); font-weight: 900; line-height: 1; color: var(--laranja); letter-spacing: -.3vw; margin: 1vh 0; white-space: nowrap; }
+.t-sub { font-size: clamp(13px, 2.4vh, 34px); font-weight: 700; }
+.t-votos .t-sub { color: var(--texto-2); }
+.t-sub b { color: var(--azul-esc); }
+.t-pct { font-size: clamp(44px, 14vh, 200px); font-weight: 900; line-height: 1; margin: 1vh 0 2vh; }
+.t-barra { height: 3.2vh; background: rgba(255, 255, 255, .25); border-radius: 99px; display: flex; overflow: hidden; gap: .3vh; margin-bottom: 1.8vh; }
+.t-barra i { display: block; height: 100%; transition: width .8s ease; }
+.t-barra .v, .t-legenda .v { background: #fff; }
+.t-barra .p, .t-legenda .p { background: repeating-linear-gradient(135deg, var(--amarelo) 0 .8vh, #ffd36b .8vh 1.5vh); }
+
+.t-locais { justify-content: flex-start; padding-top: 2.4vh; padding-bottom: 2.4vh; }
+.t-locais ol { list-style: none; margin: 1.6vh 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.4vw; }
+.t-locais li { min-width: 0; }
+.t-locais .pos { font-size: clamp(11px, 1.7vh, 24px); font-weight: 800; opacity: .8; }
+.t-locais .nome { font-size: clamp(12px, 2.1vh, 30px); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: .3vh 0 .8vh; }
+.t-locais .val { font-size: clamp(20px, 5vh, 72px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.t-locais .mini { height: 1.2vh; background: rgba(255, 255, 255, .22); border-radius: 99px; margin-top: 1vh; display: flex; overflow: hidden; }
+.t-locais .mini i { display: block; height: 100%; }
+.t-locais .mini .v { background: #fff; }
+.t-locais .mini .p { background: var(--amarelo); }
+.t-locais .urn { font-size: clamp(10px, 1.6vh, 22px); font-weight: 600; opacity: .85; margin-top: .6vh; }
+.t-vazio { grid-column: 1 / -1; font-size: clamp(14px, 2.6vh, 34px); font-weight: 700; opacity: .9; }
+
+.t-rodape { display: flex; justify-content: space-between; gap: 2vw; font-size: clamp(11px, 1.8vh, 24px); font-weight: 700; opacity: .95; }
+.t-legenda { display: inline-flex; align-items: center; gap: .6vw; white-space: nowrap; }
+.t-legenda i { width: 1.8vh; height: 1.8vh; border-radius: .4vh; display: inline-block; margin-left: .8vw; }
+
+.t-controles {
+  position: fixed; left: 50%; transform: translateX(-50%); top: 1.6vh; display: flex; gap: 8px; z-index: 10; opacity: 0; transition: opacity .3s;
+}
+.telao:hover .t-controles, .t-controles:focus-within, .telao.mostrar-controles .t-controles { opacity: 1; }
+.t-controles select, .t-controles button, .t-controles a {
+  font: 700 14px var(--fonte); color: var(--texto); background: #fff; border: 0; border-radius: 10px; padding: 9px 14px; cursor: pointer; text-decoration: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .2);
+}
+.telao.cheia .t-controles #t-cheia { display: none; }
+.t-controles .t-voltar { background: var(--laranja); color: #fff; }
+/* o Voltar fica sempre visível (discreto) no canto, mesmo quando os outros controles somem */
+.t-voltar-fixo { position: fixed; left: 1.2vw; bottom: 1.4vh; z-index: 11; }
+.t-credito { font-size: clamp(10px, 1.4vh, 18px); font-weight: 600; opacity: .8; white-space: nowrap; }
+.t-credito b { font-weight: 800; }
+
+@keyframes tsobe { from { transform: translateY(1.4vh); opacity: .3; } }
+.t-anima { animation: tsobe .6s ease-out; }
+
+/* Retrato (celular / TV em pé): rola a página normalmente */
+@media (orientation: portrait) {
+  .pg-telao { overflow: auto; }
+  .telao { position: relative; inset: auto; min-height: 100vh; display: flex; flex-direction: column; gap: 14px; padding: 16px 14px 90px; }
+  .telao::before { width: 140vw; height: 140vw; left: -70vw; top: -100vw; }
+  .t-topo { flex-wrap: wrap; gap: 10px 14px; }
+  .t-logo { height: 64px; }
+  .t-titulo { min-width: 150px; }
+  .t-aovivo { font-size: 12px; padding: 5px 10px; gap: 6px; letter-spacing: 1.5px; }
+  .t-ponto { width: 9px; height: 9px; }
+  .t-mun { font-size: 26px; margin-top: 4px; }
+  .t-hora { flex-basis: 100%; text-align: left; display: flex; align-items: baseline; gap: 10px; }
+  .t-hora b { display: inline; font-size: 22px; }
+  .t-hora span { font-size: 12px; }
+  .t-principal { display: flex; flex-direction: column; gap: 14px; }
+  .t-votos, .t-urnas, .t-locais { border-radius: 18px; padding: 18px; }
+  .t-rot { font-size: 12px; letter-spacing: 1.5px; }
+  .t-numero { font-size: clamp(56px, 19vw, 140px); margin: 6px 0; }
+  .t-sub { font-size: 15px; }
+  .t-pct { font-size: clamp(44px, 15vw, 110px); margin: 6px 0 12px; }
+  .t-barra { height: 16px; margin-bottom: 10px; }
+  .t-locais ol { grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
+  .t-locais li { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 10px; }
+  .t-locais .pos { font-size: 13px; }
+  .t-locais .nome { margin: 0; font-size: 15px; }
+  .t-locais .val { font-size: 24px; }
+  .t-locais .mini, .t-locais .urn { display: none; }
+  .t-rodape { flex-direction: column; gap: 6px; font-size: 13px; }
+  .t-legenda i { width: 12px; height: 12px; margin-left: 6px; }
+  .t-controles { opacity: 1; top: auto; bottom: 12px; left: 12px; right: 12px; transform: none; justify-content: center; }
+}
+
+/* ===== Telão da Apuração TSE (mesmo desenho do telão) ===== */
+.telao-tse .t-status { font-size: clamp(26px, min(8.5vh, 3.6vw), 120px); font-weight: 900; line-height: 1.02; margin: 1.4vh 0 2.2vh; letter-spacing: -.1vw; }
+.telao-tse.st-eleito .t-status { color: #fff; text-shadow: 0 .4vh 2vh rgba(0, 60, 40, .35); }
+.telao-tse.st-fora-faixa .t-status { color: #ffd36b; }
+.telao-tse.st-abaixo-clausula .t-status { color: #ffd2c9; }
+.telao-tse .t-medidor { position: relative; height: 3.2vh; background: rgba(255, 255, 255, .25); border-radius: 99px; margin-bottom: 1.8vh; }
+.telao-tse .t-medidor i { display: block; height: 100%; border-radius: 99px; background: #fff; transition: width .8s ease; }
+.telao-tse.st-fora-faixa .t-medidor i { background: var(--amarelo); }
+.telao-tse.st-abaixo-clausula .t-medidor i { background: #ff8f7a; }
+.telao-tse .t-marca { position: absolute; left: 10%; top: -.7vh; bottom: -.7vh; width: .35vh; min-width: 2px; background: #0a3550; border-radius: 2px; }
+.telao-tse .t-urnas .t-sub b { color: #fff; }
+.telao-tse .t-locais li.nosso { background: rgba(255, 255, 255, .16); border-radius: 1.6vh; padding: .8vh .8vw; margin: -.8vh -.8vw; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55); }
+.telao-tse .t-locais .mini i.eleito, .telao-tse .t-legenda .v { background: #fff; }
+.telao-tse .t-locais .mini i.clausula, .telao-tse .t-legenda .c { background: var(--amarelo); }
+.telao-tse .t-locais .mini i.abaixo, .telao-tse .t-legenda .x { background: #ff8f7a; }
+@media (orientation: portrait) {
+  .telao-tse .t-status { font-size: clamp(30px, 10vw, 64px); margin: 6px 0 12px; }
+  .telao-tse .t-medidor { height: 16px; margin-bottom: 10px; }
+  .telao-tse .t-locais li.nosso { margin: 0; padding: 8px 10px; }
+  .telao-tse .t-legenda { flex-wrap: wrap; white-space: normal; row-gap: 4px; }
+}
+/* Telão TSE: duas telas (candidato / eleitos) */
+.telao-tse { grid-template-rows: auto 1fr auto; }
+.telao-tse .t-vista { display: grid; grid-template-rows: 1fr auto; gap: 2.2vh; min-height: 0; }
+.telao-tse .t-vista[hidden] { display: none; }
+.telao-tse .t-eleitos { grid-template-rows: auto 1fr; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); border-radius: 3vh; padding: 2.4vh 2.2vw; backdrop-filter: blur(6px); }
+.t-eleitos-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 2vw; flex-wrap: wrap; }
+.t-el-resumo { font-size: clamp(13px, 2.4vh, 34px); font-weight: 700; }
+.t-el-resumo b { color: #ffd36b; }
+.t-el-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(18vw, 1fr)); grid-auto-rows: min-content; gap: 1.4vh 1.2vw; align-content: start; min-height: 0; overflow: hidden; }
+.t-el-partido { background: rgba(10, 53, 80, .22); border-radius: 1.8vh; padding: 1.2vh 1vw; min-width: 0; }
+.t-el-partido.nosso { background: #fff; color: var(--texto); box-shadow: 0 1vh 3vh rgba(0, 40, 70, .25); }
+.t-el-pcab { display: flex; justify-content: space-between; align-items: center; gap: .8vw; font-size: clamp(11px, 1.8vh, 26px); font-weight: 800; letter-spacing: .05vw; margin-bottom: .6vh; }
+.t-el-pcab b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-el-pcab span { background: var(--laranja); color: #fff; border-radius: 99px; min-width: 3.2vh; height: 3.2vh; display: grid; place-items: center; font-size: clamp(11px, 1.8vh, 24px); flex: none; }
+.t-el-partido ol { list-style: none; margin: 0; padding: 0; }
+.t-el-partido li { display: flex; justify-content: space-between; gap: .8vw; font-size: clamp(11px, 1.9vh, 26px); font-weight: 700; padding: .35vh 0; }
+.t-el-partido li .nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-el-partido li .v { opacity: .85; flex: none; }
+.t-el-partido li.nosso { color: var(--laranja); font-weight: 900; }
+.t-el-partido li.sem { opacity: .7; font-style: italic; }
+@media (orientation: portrait) {
+  .telao-tse .t-vista { display: flex; flex-direction: column; gap: 14px; }
+  .telao-tse .t-eleitos { border-radius: 18px; padding: 16px; }
+  .t-el-grade { grid-template-columns: 1fr; gap: 10px; overflow: visible; }
+  .t-el-partido { padding: 10px 12px; border-radius: 14px; }
+  .t-el-pcab { font-size: 14px; } .t-el-pcab span { min-width: 24px; height: 24px; font-size: 13px; }
+  .t-el-partido li { font-size: 14px; padding: 3px 0; }
+  .t-el-resumo { font-size: 14px; }
+  .t-controles { flex-wrap: wrap; }
+}
+.telao-tse.vista-eleitos .t-legenda { visibility: hidden; }
+.t-el-resumo b { color: #fff; text-decoration: underline; text-decoration-color: var(--laranja); text-decoration-thickness: .35vh; text-underline-offset: .5vh; }
+.t-eleitos-cab { flex-wrap: nowrap; }
+.t-eleitos-cab .t-rot { white-space: nowrap; }
+.t-el-resumo { text-align: right; }
+@media (orientation: portrait) { .t-eleitos-cab { flex-wrap: wrap; } .t-el-resumo { text-align: left; } }
+.telao-tse .t-falta { color: #ffd36b !important; font-size: 1.25em; }
+.telao-tse .t-bloqueio { position: absolute; inset: 0; z-index: 9; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; text-align: center; padding: 6vw;
+  background: radial-gradient(120% 90% at 100% 100%, #0089b8 0%, #019fc6 45%, #02a9d1 100%); }
+.telao-tse .t-bloqueio[hidden] { display: none; }
+.telao-tse .t-bloqueio b { font-size: clamp(24px, 6vh, 80px); font-weight: 900; line-height: 1.1; }
+.telao-tse .t-bloqueio span { font-size: clamp(14px, 2.6vh, 36px); font-weight: 600; opacity: .9; }
