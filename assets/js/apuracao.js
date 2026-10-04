@@ -18,6 +18,7 @@
   $('#ap-telao').innerHTML = ICON.tv + 'Modo telão';
   $('#ap-excel').innerHTML = ICON.excel + 'Exportar Excel';
   $('#ap-relatorio').innerHTML = ICON.impressora + 'Relatório para impressão';
+  $('#ap-tse').innerHTML = ICON.grafico + 'Apuração TSE';
   $('#ap-excel').addEventListener('click', function () {
     if (!dados) return App.toast('Aguarde os dados carregarem.', 'erro');
     var b = this; App.carregando(b, true, 'Gerando…');

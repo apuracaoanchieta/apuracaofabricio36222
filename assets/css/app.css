@@ -637,3 +637,36 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
 .aptos-info { font-size: 12.5px; color: var(--texto-2); font-weight: 600; margin-top: 6px; }
 .aptos-alerta { margin-top: 8px; }
 .chip .aptos { display: block; font-size: 9.5px; font-weight: 600; opacity: .7; }
+
+/* ===== Apuração TSE (mesmos tokens do sistema) ===== */
+.btn-topo-txt { width: auto; padding: 0 14px; font-weight: 700; white-space: nowrap; }
+.botoes-linha { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.tabela tr.linha-nosso td { background: #fff3e8; }
+.tabela tr.linha-nosso td:first-child { box-shadow: inset 4px 0 0 var(--laranja); }
+.selo.selo-grande { font-size: 15px; padding: 8px 14px; margin-top: 6px; }
+.status-tse-in { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.status-tse-in > p { max-width: 560px; }
+.rot-mini { font-size: 12px; font-weight: 700; color: var(--texto-2); text-transform: uppercase; letter-spacing: .6px; }
+.medidor { position: relative; height: 22px; background: var(--trilho); border-radius: 99px; overflow: visible; }
+.medidor > i { display: block; height: 100%; border-radius: 99px; transition: width .4s; }
+.medidor-marca { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--texto); opacity: .6; }
+.medidor-legenda { position: relative; height: 18px; margin-top: 6px; font-size: 11.5px; font-weight: 600; color: var(--texto-2); }
+.medidor-legenda span { position: absolute; top: 0; white-space: nowrap; }
+.medidor-legenda span:nth-child(2) { transform: translateX(-12px); }
+@media (max-width: 520px) { .medidor-legenda span:nth-child(2) { display: none; } }
+.lista-sobras { margin: 8px 0; padding-left: 22px; font-size: 13.5px; columns: 2; }
+@media (max-width: 640px) { .lista-sobras { columns: 1; } }
+.lista-sobras li { margin: 3px 0; break-inside: avoid; }
+.linha-tempo { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid var(--linha); }
+.linha-tempo li { position: relative; padding: 0 0 14px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.linha-tempo li::before { content: ''; position: absolute; left: -26px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--texto-3); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--linha-forte); }
+.linha-tempo li span { font-size: 12px; color: var(--texto-2); font-weight: 600; }
+.linha-tempo li.lt-eleito::before { background: var(--ok); }
+.linha-tempo li.lt-fora-faixa::before { background: var(--laranja); }
+.linha-tempo li.lt-abaixo-clausula::before { background: var(--perigo); }
+.previa-tse { border: 2px dashed var(--amarelo); }
+@media (max-width: 640px) {
+  .card-titulo:has(.botoes-linha) { flex-wrap: wrap; }
+  .botoes-linha { justify-content: flex-start; width: 100%; }
+  .botoes-linha .btn { white-space: normal; }
+}

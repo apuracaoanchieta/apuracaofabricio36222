@@ -21,7 +21,11 @@ var Core = (function () {
       'local_id', 'local', 'secao_id', 'secao', 'votos', 'votos_informados', 'foto_id',
       'status', 'validado_por', 'validado_em', 'obs'],
     USUARIOS: ['usuario', 'perfil', 'salt', 'hash', 'ativo', 'criado_em'],
-    LOG: ['data', 'usuario', 'acao', 'detalhe']
+    LOG: ['data', 'usuario', 'acao', 'detalhe'],
+    /* Apuração TSE (resultado oficial estadual) */
+    TSE_PARTIDOS: ['id', 'sigla', 'agremiacao', 'votos', 'origem', 'atualizado_em'],
+    TSE_CANDIDATOS: ['id', 'numero', 'nome', 'partido', 'situacao', 'votos', 'origem', 'atualizado_em'],
+    TSE_HISTORICO: ['t', 'votos_validos', 'qe', 'vagas_partido', 'candidato_votos', 'candidato_pct_qe', 'marco']
   };
 
   var STATUS = { PENDENTE: 'PENDENTE', VALIDADO: 'VALIDADO', REJEITADO: 'REJEITADO', DESCARTADO: 'DESCARTADO' };
@@ -38,9 +42,13 @@ var Core = (function () {
     ['foto_obrigatoria', 'TRUE', 'Exigir foto do BU no envio do fiscal'],
     ['alerta_votos_ativo', 'FALSE', 'TRUE = avisa o fiscal quando digitar votos acima do limite; FALSE = sem aviso'],
     ['alerta_votos_max', '400', 'Avisa o fiscal se digitar mais votos que isto em uma seção'],
-    ['pasta_fotos_id', '', 'ID da pasta do Google Drive com as fotos (preenchido automaticamente)']
+    ['pasta_fotos_id', '', 'ID da pasta do Google Drive com as fotos (preenchido automaticamente)'],
+    ['tse_url', 'https://resultados.tse.jus.br/oficial/ele2026/6259/dados/es/es-c0007-e006259-u.json', 'Endereço do arquivo de resultado do TSE (Deputado Estadual/ES)'],
+    ['vagas_total', '30', 'Vagas em disputa na Assembleia Legislativa'],
+    ['tse_atualizado_em', '', 'Data/hora do último resultado aplicado do TSE (automático)'],
+    ['tse_situacao', '', 'Situação da totalização no último resultado do TSE (automático)']
   ];
-  var CONFIG_INTERNA = { pasta_fotos_id: true };
+  var CONFIG_INTERNA = { pasta_fotos_id: true, tse_atualizado_em: true, tse_situacao: true };
 
   /* Locais e seções de Anchieta — Zona 17 (relação 2026) */
   var SEED = [
@@ -834,6 +842,243 @@ var Core = (function () {
     });
   };
 
+  /* ================================================================== */
+  /* APURAÇÃO TSE — resultado oficial, partidos/candidatos e histórico   */
+  /* ================================================================== */
+  function slug(v) { return norm(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''); }
+  function idPartidoTse(sigla) { return 'p-' + (slug(sigla) || 'x'); }
+  function idCandidatoTse(numero, nome) { var n = digits(numero); return n ? 'num-' + n : 'nome-' + (slug(nome) || 'x'); }
+  function numOuZero(v) { var n = Number(v); return isFinite(n) && n > 0 ? Math.floor(n) : 0; }
+  function mapTsePartidos(db) {
+    return db.read('TSE_PARTIDOS').map(function (r) {
+      return { id: str(r.id), sigla: str(r.sigla), agremiacao: str(r.agremiacao), votos: numOuZero(r.votos), origem: str(r.origem), atualizado_em: str(r.atualizado_em), _row: r._row };
+    });
+  }
+  function mapTseCandidatos(db) {
+    return db.read('TSE_CANDIDATOS').map(function (r) {
+      return { id: str(r.id), numero: digits(r.numero), nome: str(r.nome), partido: str(r.partido), situacao: str(r.situacao), votos: numOuZero(r.votos), origem: str(r.origem), atualizado_em: str(r.atualizado_em), _row: r._row };
+    });
+  }
+  function mapTseHistorico(db) {
+    return db.read('TSE_HISTORICO').map(function (r) {
+      var pct = r.candidato_pct_qe === '' || r.candidato_pct_qe === null ? null : Number(r.candidato_pct_qe);
+      var cv = r.candidato_votos === '' || r.candidato_votos === null ? null : Number(r.candidato_votos);
+      return { t: str(r.t), votosValidos: numOuZero(r.votos_validos), QE: numOuZero(r.qe), vagasDoPartido: numOuZero(r.vagas_partido),
+        candidatoVotos: isFinite(cv) ? cv : null, candidatoPctQE: isFinite(pct) ? pct : null, marco: str(r.marco), _row: r._row };
+    });
+  }
+  function gravarConfigInterna(db, chave, valor) {
+    var rows = db.read('CONFIG');
+    var r = find(rows, function (x) { return str(x.chave) === chave; });
+    var desc = (find(CONFIG_PADRAO, function (c) { return c[0] === chave; }) || [0, 0, ''])[2];
+    if (r) db.update('CONFIG', r._row, { chave: chave, valor: valor, descricao: str(r.descricao) || desc });
+    else db.append('CONFIG', { chave: chave, valor: valor, descricao: desc });
+  }
+
+  /* Arquivo do TSE: carg → agr → par → cand (cargo → agremiação → partido → candidato).
+   * Mantém a agremiação quando ela reúne mais de um partido (federação), para o cálculo de vagas. */
+  function extrairCandidatoTse(c, siglaPartidoPai) {
+    return {
+      numero: String(c.n != null ? c.n : (c.numero != null ? c.numero : '')),
+      nome: c.nm || c.nome || c.nmu || '',
+      partido: c.sg || c.partido || siglaPartidoPai || '',
+      situacao: c.st || c.situacao || '',
+      votos: Number(c.vap != null ? c.vap : (c.votos != null ? c.votos : 0))
+    };
+  }
+  function extrairPartidoTse(p, agremiacao) {
+    var votosNominais = Number(p.tvan != null ? p.tvan : (p.tvtn != null ? p.tvtn : 0));
+    var votosLegenda = Number(p.tval != null ? p.tval : (p.tvtl != null ? p.tvtl : 0));
+    return { sigla: p.sg || p.sigla || p.nm || '', agremiacao: agremiacao || '', votos: votosNominais + votosLegenda };
+  }
+  function normalizarResultadoTse(raw) {
+    var candidatos = [], partidos = [];
+    (raw.carg || []).forEach(function (cg) {
+      (cg.agr || []).forEach(function (agr) {
+        var pars = agr.par || [];
+        var nomeAgr = pars.length > 1 ? (agr.nm || agr.sg || pars.map(function (p) { return p.sg || p.sigla || ''; }).join('/')) : '';
+        pars.forEach(function (p) {
+          partidos.push(extrairPartidoTse(p, nomeAgr));
+          (p.cand || []).forEach(function (c) { candidatos.push(extrairCandidatoTse(c, p.sg || p.sigla)); });
+        });
+      });
+    });
+    candidatos = candidatos.filter(function (c) { return c.numero; });
+    partidos = partidos.filter(function (p) { return p.sigla; });
+    if (!candidatos.length && !partidos.length) throw erro('Não consegui reconhecer nenhum candidato/partido no arquivo do TSE.');
+    var secoesNaoTotalizadas = raw.snt != null ? raw.snt : (raw.perst != null ? raw.perst : null);
+    return {
+      atualizadoEm: raw.dg && raw.hg ? (raw.dg + ' ' + raw.hg) : '',
+      secoesTotalizadas: raw.pst || (secoesNaoTotalizadas != null ? (Number(secoesNaoTotalizadas) === 0 ? 'totalização final' : secoesNaoTotalizadas + ' seção(ões) ainda não totalizada(s)') : ''),
+      candidatos: candidatos,
+      partidos: partidos
+    };
+  }
+
+  function exigeApuracaoTse(db, req) { return autenticar(db, req.token, [PERFIS.APURACAO]); }
+
+  ACOES['tse.dados'] = function (db, req) {
+    exigeApuracaoTse(db, req);
+    var cfg = lerConfig(db);
+    return {
+      config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
+      partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
+      historico: mapTseHistorico(db).map(strip), agora: db.stamp()
+    };
+  };
+
+  /* Busca no TSE e devolve só a PRÉVIA (nada é gravado aqui) */
+  ACOES['tse.buscar'] = function (db, req) {
+    exigeApuracaoTse(db, req);
+    var url = str(lerConfig(db).tse_url);
+    if (!url) throw erro('A URL do resultado do TSE ainda não foi configurada.');
+    if (!db.fetchJson) throw erro('A busca no TSE não está disponível neste ambiente.');
+    var resp = db.fetchJson(url);
+    if (resp.status !== 200) throw erro('O TSE respondeu ' + resp.status + ' para essa URL — os dados podem ainda não estar publicados.');
+    var raw;
+    try { raw = JSON.parse(resp.text); } catch (e) { throw erro('A resposta do TSE não veio em JSON válido — o formato pode ter mudado.'); }
+    return { preview: normalizarResultadoTse(raw) };
+  };
+
+  /* Aplica a prévia: grava partidos e candidatos sempre com id fixo (sem duplicar se repetir) */
+  ACOES['tse.aplicar'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    var partidos = Array.isArray(req.partidos) ? req.partidos : [], candidatos = Array.isArray(req.candidatos) ? req.candidatos : [];
+    if (!partidos.length && !candidatos.length) throw erro('A prévia está vazia.');
+    if (partidos.length > 200 || candidatos.length > 3000) throw erro('Prévia grande demais.');
+    return db.lock(function () {
+      var agora = db.stamp();
+      var ps = {}, ordemP = [];
+      mapTsePartidos(db).forEach(function (p) { ps[p.id] = p; ordemP.push(p.id); });
+      partidos.forEach(function (p) {
+        var sigla = str(p.sigla).toUpperCase().substr(0, 60); if (!sigla) return;
+        var id = idPartidoTse(sigla);
+        if (!ps[id]) ordemP.push(id);
+        ps[id] = { id: id, sigla: sigla, agremiacao: str(p.agremiacao).substr(0, 120), votos: numOuZero(p.votos), origem: 'TSE', atualizado_em: agora };
+      });
+      var cs = {}, ordemC = [];
+      mapTseCandidatos(db).forEach(function (c) { cs[c.id] = c; ordemC.push(c.id); });
+      candidatos.forEach(function (c) {
+        var numero = digits(c.numero).substr(0, 8); if (!numero) return;
+        var id = idCandidatoTse(numero);
+        if (!cs[id]) ordemC.push(id);
+        cs[id] = { id: id, numero: numero, nome: str(c.nome).substr(0, 80) || ('Candidato ' + numero), partido: str(c.partido).toUpperCase().substr(0, 120),
+          situacao: str(c.situacao).substr(0, 40), votos: numOuZero(c.votos), origem: 'TSE', atualizado_em: agora };
+      });
+      db.replaceAll('TSE_PARTIDOS', ordemP.map(function (id) { return strip(ps[id]); }));
+      db.replaceAll('TSE_CANDIDATOS', ordemC.map(function (id) { return strip(cs[id]); }));
+      gravarConfigInterna(db, 'tse_atualizado_em', str(req.atualizadoEm).substr(0, 40) || agora);
+      gravarConfigInterna(db, 'tse_situacao', str(req.secoesTotalizadas).substr(0, 80));
+      log(db, u.usuario, 'TSE_APLICAR', partidos.length + ' partidos, ' + candidatos.length + ' candidatos');
+      return { partidos: ordemP.length, candidatos: ordemC.length };
+    });
+  };
+
+  ACOES['tse.salvarPartido'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    var sigla = str(req.sigla).toUpperCase().substr(0, 60);
+    if (!sigla) throw erro('Informe a sigla do partido.');
+    var votos = int(req.votos);
+    if (isNaN(votos) || votos < 0 || votos > 99999999) throw erro('Quantidade de votos inválida.');
+    return db.lock(function () {
+      var lista = mapTsePartidos(db), id = idPartidoTse(sigla);
+      var antigo = req.id ? find(lista, function (p) { return p.id === str(req.id); }) : null;
+      var conflito = find(lista, function (p) { return p.id === id && (!antigo || p.id !== antigo.id); });
+      if (conflito) throw erro('Esse partido já está na lista.');
+      var obj = { id: id, sigla: sigla, agremiacao: str(req.agremiacao).substr(0, 120), votos: votos, origem: 'MANUAL', atualizado_em: db.stamp() };
+      if (antigo) db.update('TSE_PARTIDOS', antigo._row, obj); else db.append('TSE_PARTIDOS', obj);
+      log(db, u.usuario, 'TSE_PARTIDO', sigla + ' ' + votos);
+      return { id: id };
+    });
+  };
+  ACOES['tse.excluirPartido'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    return db.lock(function () {
+      var p = find(mapTsePartidos(db), function (x) { return x.id === str(req.id); });
+      if (!p) throw erro('Partido não encontrado.');
+      db.remove('TSE_PARTIDOS', p._row);
+      log(db, u.usuario, 'TSE_EXCLUIR_PARTIDO', p.sigla);
+      return { id: p.id };
+    });
+  };
+  ACOES['tse.salvarCandidato'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    var nome = str(req.nome).toUpperCase().substr(0, 80), numero = digits(req.numero).substr(0, 8);
+    if (!nome && !numero) throw erro('Informe o nome ou o número do candidato.');
+    var votos = int(req.votos);
+    if (isNaN(votos) || votos < 0 || votos > 9999999) throw erro('Quantidade de votos inválida.');
+    return db.lock(function () {
+      var lista = mapTseCandidatos(db), id = idCandidatoTse(numero, nome);
+      var antigo = req.id ? find(lista, function (c) { return c.id === str(req.id); }) : null;
+      var conflito = find(lista, function (c) { return c.id === id && (!antigo || c.id !== antigo.id); });
+      if (conflito) throw erro('Esse candidato já está na lista.');
+      var obj = { id: id, numero: numero, nome: nome || ('CANDIDATO ' + numero), partido: str(req.partido).toUpperCase().substr(0, 120),
+        situacao: antigo ? antigo.situacao : '', votos: votos, origem: 'MANUAL', atualizado_em: db.stamp() };
+      if (antigo) db.update('TSE_CANDIDATOS', antigo._row, obj); else db.append('TSE_CANDIDATOS', obj);
+      log(db, u.usuario, 'TSE_CANDIDATO', (numero || nome) + ' ' + votos);
+      return { id: id };
+    });
+  };
+  ACOES['tse.excluirCandidato'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    return db.lock(function () {
+      var c = find(mapTseCandidatos(db), function (x) { return x.id === str(req.id); });
+      if (!c) throw erro('Candidato não encontrado.');
+      db.remove('TSE_CANDIDATOS', c._row);
+      log(db, u.usuario, 'TSE_EXCLUIR_CANDIDATO', c.numero + ' ' + c.nome);
+      return { id: c.id };
+    });
+  };
+  /* Carrega candidatos da lista de aptos (votos = 0); quem já existe fica como está */
+  ACOES['tse.carregarCandidatos'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    var lista = Array.isArray(req.lista) ? req.lista.slice(0, 1000) : [];
+    if (!lista.length) throw erro('Nenhum candidato para carregar.');
+    return db.lock(function () {
+      var atuais = mapTseCandidatos(db), ids = {}, novos = [];
+      atuais.forEach(function (c) { ids[c.id] = true; });
+      lista.forEach(function (c) {
+        var numero = digits(c.numero).substr(0, 8), nome = str(c.nome).toUpperCase().substr(0, 80);
+        if (!numero && !nome) return;
+        var id = idCandidatoTse(numero, nome);
+        if (ids[id]) return;
+        ids[id] = true;
+        novos.push({ id: id, numero: numero, nome: nome, partido: str(c.partido).toUpperCase().substr(0, 120), situacao: 'APTO', votos: 0, origem: 'LISTA', atualizado_em: db.stamp() });
+      });
+      if (novos.length) db.replaceAll('TSE_CANDIDATOS', atuais.map(strip).concat(novos));
+      log(db, u.usuario, 'TSE_CARREGAR_CANDIDATOS', novos.length + ' novos');
+      return { adicionados: novos.length, existentes: lista.length - novos.length };
+    });
+  };
+
+  /* Histórico: no máx. 150 pontos; sem "forçar", um ponto a menos de 2 min do último o substitui */
+  var MAX_PONTOS_HISTORICO = 150, INTERVALO_MIN_SNAPSHOT_MS = 2 * 60 * 1000;
+  function msDe(stamp) { var m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d):(\d\d)/.exec(str(stamp)); return m ? Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +m[6]) : 0; }
+  ACOES['tse.registrar'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    var p = req.ponto || {};
+    var num = function (v) { var n = Number(v); return v === null || v === undefined || v === '' || !isFinite(n) ? '' : n; };
+    var marcos = { 'eleito': 1, 'fora-faixa': 1, 'abaixo-clausula': 1, 'sem-candidato': 1, 'sem-dados': 1 };
+    return db.lock(function () {
+      var ponto = { t: db.stamp(), votos_validos: num(p.votosValidos), qe: num(p.QE), vagas_partido: num(p.vagasDoPartido),
+        candidato_votos: num(p.candidatoVotos), candidato_pct_qe: num(p.candidatoPctQE), marco: marcos[str(p.marco)] ? str(p.marco) : '' };
+      var pontos = mapTseHistorico(db), ultimo = pontos[pontos.length - 1], substituiu = false;
+      if (!req.forcar && ultimo && (msDe(ponto.t) - msDe(ultimo.t)) < INTERVALO_MIN_SNAPSHOT_MS) { db.update('TSE_HISTORICO', ultimo._row, ponto); substituiu = true; }
+      else db.append('TSE_HISTORICO', ponto);
+      var todos = mapTseHistorico(db);
+      if (todos.length > MAX_PONTOS_HISTORICO) {
+        todos.slice(0, todos.length - MAX_PONTOS_HISTORICO).sort(function (a, b) { return b._row - a._row; })
+          .forEach(function (x) { db.remove('TSE_HISTORICO', x._row); });
+      }
+      if (req.forcar) log(db, u.usuario, 'TSE_REGISTRAR', ponto.marco);
+      return { substituiu: substituiu };
+    });
+  };
+  ACOES['tse.limparHistorico'] = function (db, req) {
+    var u = exigeApuracaoTse(db, req);
+    return db.lock(function () { db.replaceAll('TSE_HISTORICO', []); log(db, u.usuario, 'TSE_LIMPAR_HISTORICO', ''); return {}; });
+  };
+
   /* ------------------------------------------------------------------ */
   /* Instalação inicial                                                   */
   /* ------------------------------------------------------------------ */
@@ -878,7 +1123,7 @@ var Core = (function () {
 
   return {
     SCHEMA: SCHEMA, STATUS: STATUS, PERFIS: PERFIS, SEED: SEED, CONFIG_PADRAO: CONFIG_PADRAO,
-    handle: handle, instalar: instalar, resolverUrnas: resolverUrnas, completarAptos: completarAptos,
+    handle: handle, instalar: instalar, resolverUrnas: resolverUrnas, completarAptos: completarAptos, normalizarResultadoTse: normalizarResultadoTse,
     sha256: sha256, hmac: hmac, norm: norm, int: int,
     ehTotal: function (l) { return /^TOT-/.test(String(l && l.secao_id || '')); }
   };
