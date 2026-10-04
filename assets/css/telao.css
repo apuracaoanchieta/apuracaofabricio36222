@@ -132,3 +132,39 @@
   .telao-tse .t-locais li.nosso { margin: 0; padding: 8px 10px; }
   .telao-tse .t-legenda { flex-wrap: wrap; white-space: normal; row-gap: 4px; }
 }
+/* Telão TSE: duas telas (candidato / eleitos) */
+.telao-tse { grid-template-rows: auto 1fr auto; }
+.telao-tse .t-vista { display: grid; grid-template-rows: 1fr auto; gap: 2.2vh; min-height: 0; }
+.telao-tse .t-vista[hidden] { display: none; }
+.telao-tse .t-eleitos { grid-template-rows: auto 1fr; background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); border-radius: 3vh; padding: 2.4vh 2.2vw; backdrop-filter: blur(6px); }
+.t-eleitos-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 2vw; flex-wrap: wrap; }
+.t-el-resumo { font-size: clamp(13px, 2.4vh, 34px); font-weight: 700; }
+.t-el-resumo b { color: #ffd36b; }
+.t-el-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(18vw, 1fr)); grid-auto-rows: min-content; gap: 1.4vh 1.2vw; align-content: start; min-height: 0; overflow: hidden; }
+.t-el-partido { background: rgba(10, 53, 80, .22); border-radius: 1.8vh; padding: 1.2vh 1vw; min-width: 0; }
+.t-el-partido.nosso { background: #fff; color: var(--texto); box-shadow: 0 1vh 3vh rgba(0, 40, 70, .25); }
+.t-el-pcab { display: flex; justify-content: space-between; align-items: center; gap: .8vw; font-size: clamp(11px, 1.8vh, 26px); font-weight: 800; letter-spacing: .05vw; margin-bottom: .6vh; }
+.t-el-pcab b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-el-pcab span { background: var(--laranja); color: #fff; border-radius: 99px; min-width: 3.2vh; height: 3.2vh; display: grid; place-items: center; font-size: clamp(11px, 1.8vh, 24px); flex: none; }
+.t-el-partido ol { list-style: none; margin: 0; padding: 0; }
+.t-el-partido li { display: flex; justify-content: space-between; gap: .8vw; font-size: clamp(11px, 1.9vh, 26px); font-weight: 700; padding: .35vh 0; }
+.t-el-partido li .nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-el-partido li .v { opacity: .85; flex: none; }
+.t-el-partido li.nosso { color: var(--laranja); font-weight: 900; }
+.t-el-partido li.sem { opacity: .7; font-style: italic; }
+@media (orientation: portrait) {
+  .telao-tse .t-vista { display: flex; flex-direction: column; gap: 14px; }
+  .telao-tse .t-eleitos { border-radius: 18px; padding: 16px; }
+  .t-el-grade { grid-template-columns: 1fr; gap: 10px; overflow: visible; }
+  .t-el-partido { padding: 10px 12px; border-radius: 14px; }
+  .t-el-pcab { font-size: 14px; } .t-el-pcab span { min-width: 24px; height: 24px; font-size: 13px; }
+  .t-el-partido li { font-size: 14px; padding: 3px 0; }
+  .t-el-resumo { font-size: 14px; }
+  .t-controles { flex-wrap: wrap; }
+}
+.telao-tse.vista-eleitos .t-legenda { visibility: hidden; }
+.t-el-resumo b { color: #fff; text-decoration: underline; text-decoration-color: var(--laranja); text-decoration-thickness: .35vh; text-underline-offset: .5vh; }
+.t-eleitos-cab { flex-wrap: nowrap; }
+.t-eleitos-cab .t-rot { white-space: nowrap; }
+.t-el-resumo { text-align: right; }
+@media (orientation: portrait) { .t-eleitos-cab { flex-wrap: wrap; } .t-el-resumo { text-align: left; } }

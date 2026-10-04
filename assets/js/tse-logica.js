@@ -145,6 +145,41 @@ var Tse = (function () {
       candidatos: candidatos, doPartido: doPartido, st: st, status: classificarStatus(st) };
   }
 
+  /* ---------- Eleitos projetados de TODOS os partidos ----------
+   * Mesma regra usada para o candidato: vagas do partido (quociente + sobras) e,
+   * dentro do partido, os mais votados que passam da cláusula de 10% do QE. */
+  function eleitosProjetados(calc) {
+    var st = calc.st;
+    if (st.kind !== 'com-dados') return { partidos: [], lista: [], vagasSemCandidato: 0, vagas: calc.vagas };
+    var porChave = {};
+    calc.candidatos.forEach(function (c) { (porChave[c.chave] = porChave[c.chave] || []).push(c); });
+    var partidos = [], lista = [], vagasSemCandidato = 0;
+    st.dist.resultado.forEach(function (r) {
+      if (!r.vagasTotal) return;
+      var ordenados = (porChave[r.chave] || []).slice().sort(function (a, b) { return b.votos - a.votos; });
+      var comClausula = aplicarClausulaDesempenho(ordenados, r.vagasTotal, st.QE);
+      var eleitos = comClausula.filter(function (c) { return c.eleito; });
+      var suplente = null;
+      comClausula.forEach(function (c) { if (!suplente && !c.eleito) suplente = c; });
+      var semCand = r.vagasTotal - eleitos.length;
+      vagasSemCandidato += semCand;
+      eleitos.forEach(function (c) { c.partidoCalculo = r.nome; lista.push(c); });
+      partidos.push({ nome: r.nome, chave: r.chave, membros: r.membros, votos: r.votos, vagas: r.vagasTotal, vagasQP: r.vagasQP, vagasSobra: r.vagasSobra,
+        eleitos: eleitos, suplente: suplente, vagasSemCandidato: semCand });
+    });
+    lista.sort(function (a, b) { return b.votos - a.votos; });
+    return { partidos: partidos, lista: lista, vagasSemCandidato: vagasSemCandidato, vagas: calc.vagas };
+  }
+  /* Situação oficial do TSE (preenchida quando a totalização termina) */
+  function situacaoOficial(s) {
+    var t = Core.norm(s);
+    if (!t) return null;
+    if (t.indexOf('NAO ELEITO') >= 0) return { chave: 'nao-eleito', label: 'não eleito' };
+    if (t.indexOf('ELEITO') >= 0) return { chave: 'eleito', label: String(s).toLowerCase() };
+    if (t.indexOf('SUPLENTE') >= 0) return { chave: 'suplente', label: 'suplente' };
+    return null;
+  }
+
   /* ---------- Lista de candidatos aptos (busca) ---------- */
   function candidatosTseDoPartido(nomePartido, listaCandidatosTse) {
     var alvo = grupoDe(nomePartido).chave;
@@ -212,7 +247,7 @@ var Tse = (function () {
     VAGAS_PADRAO: VAGAS_PADRAO, LABEL_MARCO: LABEL_MARCO,
     grupoDe: grupoDe, agruparPartidos: agruparPartidos, rotuloFederacao: rotuloFederacao,
     calcularDistribuicao: calcularDistribuicao, aplicarClausulaDesempenho: aplicarClausulaDesempenho,
-    statusCandidato: statusCandidato, classificarStatus: classificarStatus, calcular: calcular,
+    statusCandidato: statusCandidato, classificarStatus: classificarStatus, calcular: calcular, eleitosProjetados: eleitosProjetados, situacaoOficial: situacaoOficial,
     candidatosTseDoPartido: candidatosTseDoPartido, candidatosTseFiltrados: candidatosTseFiltrados,
     montarPontoHistorico: montarPontoHistorico, marcosDoHistorico: marcosDoHistorico,
     dadosVagasPorPartido: dadosVagasPorPartido, dadosDistribuicaoVotos: dadosDistribuicaoVotos, dadosEvolucao: dadosEvolucao

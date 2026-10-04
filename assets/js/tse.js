@@ -67,6 +67,7 @@
     if (!dados) return;
     if (aba === 'resultado') renderResultado();
     else if (aba === 'projecao') renderProjecao();
+    else if (aba === 'eleitos') renderEleitos();
     else if (aba === 'aptos') renderAptos();
     else if (aba === 'graficos') renderGraficos();
     else renderHistorico();
@@ -313,6 +314,51 @@
         chamar('tse.excluirCandidato', { id: id }).then(function () { App.toast('Candidato excluído.'); m.fechar(); carregar(true); }).catch(function (e) { App.toast(e.message, 'erro'); });
       });
     };
+  }
+
+  /* ================= ELEITOS PROJETADOS (todos os partidos) ================= */
+  var eleitosVista = 'partido';
+  function seloOficial(c) {
+    var o = Tse.situacaoOficial(c.situacao);
+    if (!o) return '<span class="muted small">—</span>';
+    return '<span class="selo selo-' + (o.chave === 'eleito' ? 'VALIDADO' : o.chave === 'suplente' ? 'AGUARDANDO' : 'DESCARTADO') + '">' + h(o.label) + '</span>';
+  }
+  function renderEleitos() {
+    var el = $('#sec-eleitos'), e = Tse.eleitosProjetados(calc), st = calc.st;
+    if (st.kind !== 'com-dados') {
+      el.innerHTML = '<div class="aviso aviso-info">' + ICON.info + '<div><b>Sem votos por partido</b>Busque e aplique o resultado em <strong>Resultado TSE</strong> para ver os eleitos projetados.</div></div>';
+      return;
+    }
+    var temOficial = calc.candidatos.some(function (c) { return Tse.situacaoOficial(c.situacao); });
+    var nossoEleito = e.lista.some(function (c) { return c.ehNosso; });
+    var html = '<div class="kpis">' +
+      '<div class="kpi destaque"><div class="rot">Eleitos projetados</div><div class="val num">' + e.lista.length + ' <span style="font-size:18px;opacity:.8">/ ' + e.vagas + '</span></div><div class="det">' + (e.vagasSemCandidato ? e.vagasSemCandidato + ' vaga(s) sem candidato acima da cláusula' : 'todas as vagas preenchidas') + '</div></div>' +
+      '<div class="kpi"><div class="rot">Partidos com vaga</div><div class="val num">' + e.partidos.length + '</div><div class="det">federações contam como um partido</div></div>' +
+      '<div class="kpi"><div class="rot">Quociente eleitoral</div><div class="val num">' + n(st.QE) + '</div><div class="det">cláusula: ' + n(Math.ceil(st.QE * 0.1)) + ' votos</div></div>' +
+      '<div class="kpi"><div class="rot">' + h(nomeCand()) + '</div><div class="val" style="font-size:22px;margin-top:10px">' + seloStatus(calc.status) + '</div><div class="det">' + (nossoEleito ? 'está na lista abaixo' : 'fora da lista de eleitos') + '</div></div></div>';
+    html += '<div class="aviso aviso-info">' + ICON.info + '<div><b>Projeção do sistema</b>Calculada com os votos aplicados do TSE: vagas de cada partido (quociente + sobras) e, dentro do partido, os mais votados acima de 10% do QE. O resultado oficial é o do TSE' +
+      (temOficial ? ': a coluna <strong>Situação TSE</strong> já mostra o que o TSE informou.' : '. Quando a totalização terminar, a coluna <strong>Situação TSE</strong> mostra a situação oficial.') + '</div></div>';
+    html += '<div class="sub-abas" role="tablist"><button class="sub-aba' + (eleitosVista === 'partido' ? ' ativa' : '') + '" data-ev="partido">Por partido</button><button class="sub-aba' + (eleitosVista === 'votos' ? ' ativa' : '') + '" data-ev="votos">Por votos</button></div>';
+    if (eleitosVista === 'votos') {
+      html += '<section class="card"><div class="card-titulo"><h3>Os ' + e.lista.length + ' eleitos projetados, do mais votado ao menos votado</h3></div><div class="tabela-wrap"><table class="tabela responsiva"><thead><tr><th class="r">#</th><th class="r">Nº</th><th>Candidato</th><th>Partido</th><th class="r">Votos</th><th class="r">% do QE</th><th>Situação TSE</th></tr></thead><tbody>' +
+        e.lista.map(function (c, i) {
+          return '<tr' + (c.ehNosso ? ' class="linha-nosso"' : '') + '><td data-l="#" class="r">' + (i + 1) + 'º</td><td data-l="Nº" class="r">' + h(c.numero) + '</td><td data-l="Candidato"><b>' + h(c.nome) + '</b></td>' +
+            '<td data-l="Partido">' + h(c.partidoCalculo) + '</td><td data-l="Votos" class="r"><b>' + n(c.votos) + '</b></td><td data-l="% do QE" class="r">' + pctFrac(c.votos / st.QE) + '</td><td data-l="Situação TSE">' + seloOficial(c) + '</td></tr>';
+        }).join('') + '</tbody></table></div></section>';
+    } else {
+      html += '<div class="eleitos-grade">' + e.partidos.map(function (p) {
+        var nosso = p.chave === calc.grupoNosso.chave;
+        return '<section class="card eleitos-partido' + (nosso ? ' nosso' : '') + '"><div class="card-titulo"><h3>' + h(p.nome) + '</h3><span class="selo selo-VALIDADO">' + p.vagas + ' vaga' + (p.vagas === 1 ? '' : 's') + '</span></div>' +
+          '<p class="tiny muted" style="margin:-8px 0 10px">' + n(p.votos) + ' votos · ' + p.vagasQP + ' pelo quociente' + (p.vagasSobra ? ' + ' + p.vagasSobra + ' nas sobras' : '') + (p.membros.length > 1 ? ' · ' + h(p.membros.join(' + ')) : '') + '</p>' +
+          '<ol class="lista-eleitos">' + p.eleitos.map(function (c) {
+            return '<li' + (c.ehNosso ? ' class="nosso"' : '') + '><span class="num">' + h(c.numero) + '</span><b>' + h(c.nome) + '</b><span class="num v">' + n(c.votos) + '</span>' + (Tse.situacaoOficial(c.situacao) ? seloOficial(c) : '') + '</li>';
+          }).join('') + (p.vagasSemCandidato ? '<li class="sem"><span></span><b>' + p.vagasSemCandidato + ' vaga(s) sem candidato acima da cláusula</b></li>' : '') + '</ol>' +
+          (p.suplente ? '<p class="tiny muted" style="margin:10px 0 0">1º suplente: <b>' + h(p.suplente.nome) + '</b> · ' + n(p.suplente.votos) + ' votos' + (p.suplente.ehNosso ? ' · <b style="color:var(--laranja)">' + h(nomeCand()) + '</b>' : '') + '</p>' : '') + '</section>';
+      }).join('') + '</div>';
+    }
+    if (e.vagasSemCandidato) html += '<p class="tiny muted">Vagas sem candidato acima da cláusula são redistribuídas pela Justiça Eleitoral entre os outros partidos; a projeção não faz essa redistribuição.</p>';
+    el.innerHTML = html;
+    $$('[data-ev]', el).forEach(function (b) { b.onclick = function () { eleitosVista = b.dataset.ev; renderEleitos(); }; });
   }
 
   /* ================= 3. CANDIDATOS APTOS (busca) ================= */

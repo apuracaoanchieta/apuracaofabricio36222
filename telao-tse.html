@@ -42,6 +42,7 @@
       <div class="t-hora"><b id="t-hora">--:--</b><span id="t-atualizado">atualizando…</span></div>
     </header>
 
+    <div class="t-vista" id="v-fab">
     <section class="t-principal">
       <div class="t-votos">
         <div class="t-rot" id="t-rot-votos">VOTOS NO ESTADO</div>
@@ -60,6 +61,12 @@
       <div class="t-rot" id="t-rot-ranking">CANDIDATOS DO PARTIDO</div>
       <ol id="t-ranking"></ol>
     </section>
+    </div>
+
+    <section class="t-vista t-eleitos" id="v-eleitos" hidden>
+      <div class="t-eleitos-cab"><div class="t-rot" id="t-el-rot">ELEITOS PROJETADOS</div><div class="t-el-resumo" id="t-el-resumo"></div></div>
+      <div class="t-el-grade" id="t-el-grade"></div>
+    </section>
 
     <footer class="t-rodape">
       <span id="t-numeros"></span>
@@ -69,6 +76,8 @@
 
     <div class="t-controles" id="t-controles">
       <button type="button" id="t-voltar" class="t-voltar">← Voltar</button>
+      <button type="button" id="t-vista">Ver eleitos</button>
+      <button type="button" id="t-alternar">Alternar: não</button>
       <button type="button" id="t-cheia">Tela cheia</button>
       <a href="./" id="t-sair">Início</a>
     </div>

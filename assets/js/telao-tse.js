@@ -5,6 +5,8 @@
   var $ = App.$, h = App.h, n = App.n;
   var sess = App.sessao.get('apuracao');
   var ultimo = null, timer = null, ocupado = false, valorAtual = 0;
+  var params = new URLSearchParams(location.search);
+  var vista = params.get('vista') === 'eleitos' ? 'eleitos' : 'fab', alternar = params.get('alternar') === '1', timerAlt = null;
 
   App.bannerDemo('Senha: <b>apuracao</b>.');
   App.$$('[data-voltar]').forEach(function (e) { e.innerHTML = App.ICON.seta; });
@@ -108,11 +110,46 @@
         '<div class="urn">' + (x.eleito ? 'dentro das vagas' : x.passaClausula ? 'passa da cláusula' : 'abaixo da cláusula') + '</div></li>';
     }).join('') : '<li class="t-vazio">Aguardando o resultado oficial do TSE…</li>';
 
+    desenharEleitos(c, nome);
+
     // rodapé
     $('#t-numeros').textContent = st.kind === 'com-dados'
       ? 'Votos válidos ' + n(c.votosValidos) + ' · Quociente eleitoral ' + n(st.QE) + ' · ' + c.vagas + ' vagas na Assembleia'
       : nome + ' · ' + (d.config.candidato_numero || '36.222') + ' · ' + (d.config.cargo || 'Deputado Estadual');
   }
+
+  /* Tela de eleitos projetados (todos os partidos) */
+  function desenharEleitos(c, nome) {
+    var e = Tse.eleitosProjetados(c);
+    $('#t-el-rot').textContent = 'ELEITOS PROJETADOS';
+    $('#t-el-resumo').innerHTML = c.st.kind === 'com-dados'
+      ? '<b>' + e.lista.length + '</b> de ' + e.vagas + ' vagas · ' + e.partidos.length + ' partidos' + (e.lista.some(function (x) { return x.ehNosso; }) ? ' · <b>' + h(nome) + ' entre os eleitos</b>' :
+        e.partidos.some(function (p) { return p.suplente && p.suplente.ehNosso; }) ? ' · <b>' + h(nome) + ': 1º suplente do ' + h(c.grupoNosso.nome) + '</b>' : '')
+      : '';
+    $('#t-el-grade').innerHTML = e.partidos.length ? e.partidos.map(function (p) {
+      var nosso = p.chave === c.grupoNosso.chave;
+      return '<div class="t-el-partido' + (nosso ? ' nosso' : '') + '"><div class="t-el-pcab"><b>' + h(p.nome) + '</b><span>' + p.vagas + '</span></div><ol>' +
+        p.eleitos.map(function (x) { return '<li' + (x.ehNosso ? ' class="nosso"' : '') + '><span class="nome">' + h(x.nome) + '</span><span class="v num">' + n(x.votos) + '</span></li>'; }).join('') +
+        (p.vagasSemCandidato ? '<li class="sem"><span class="nome">' + p.vagasSemCandidato + ' vaga(s) sem candidato</span></li>' : '') + '</ol></div>';
+    }).join('') : '<div class="t-vazio">Aguardando o resultado oficial do TSE…</div>';
+    if (vista === 'eleitos') $('#t-vista').textContent = 'Ver ' + nome;
+  }
+  function mostrarVista(v) {
+    vista = v;
+    $('#v-fab').hidden = v !== 'fab'; $('#v-eleitos').hidden = v !== 'eleitos';
+    $('#telao').classList.toggle('vista-eleitos', v === 'eleitos');
+    $('#t-vista').textContent = v === 'fab' ? 'Ver eleitos' : 'Ver ' + ((ultimo && ultimo.config.candidato_nome) || 'candidato');
+    var u = new URL(location.href); u.searchParams.set('vista', v === 'eleitos' ? 'eleitos' : 'candidato'); history.replaceState(null, '', u);
+  }
+  function ajustarAlternar() {
+    clearInterval(timerAlt);
+    $('#t-alternar').textContent = 'Alternar: ' + (alternar ? 'sim' : 'não');
+    if (alternar) timerAlt = setInterval(function () { mostrarVista(vista === 'fab' ? 'eleitos' : 'fab'); }, 20000);
+    var u = new URL(location.href); if (alternar) u.searchParams.set('alternar', '1'); else u.searchParams.delete('alternar'); history.replaceState(null, '', u);
+  }
+  $('#t-vista').addEventListener('click', function () { mostrarVista(vista === 'fab' ? 'eleitos' : 'fab'); if (alternar) ajustarAlternar(); });
+  $('#t-alternar').addEventListener('click', function () { alternar = !alternar; ajustarAlternar(); });
+  mostrarVista(vista); ajustarAlternar();
 
   function alternarCheia() {
     if (!document.fullscreenElement) { (document.documentElement.requestFullscreen || function () {}).call(document.documentElement); }
