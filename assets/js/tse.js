@@ -14,7 +14,7 @@
   App.bannerDemo('Senha: <b>apuracao</b>. O "TSE" aqui é simulado: cada busca avança a totalização.');
   App.$$('[data-voltar]').forEach(function (e) { e.innerHTML = ICON.seta; });
   $('#btn-voltar').innerHTML = '← <span class="oculto-mobile">Voltar à </span>Apuração';
-  $('#btn-telao-tse').innerHTML = ICON.tv + 'Telão';
+  $('#btn-telao-tse').innerHTML = ICON.tv + 'Modo telão';
 
   /* ================= LOGIN ================= */
   function telaLogin() {
