@@ -81,3 +81,10 @@
   .rel-secoes { columns: 3; }
   .rel-kpis { grid-template-columns: 1.4fr 1fr 1fr; }
 }
+/* Relatório final */
+.rel-kpis.rel-kpis-4 { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+.rel-kpi .rel-kpi-txt { font-size: 17px; line-height: 1.2; }
+.rel-tab tr.nosso td { background: #fff3e8; font-weight: 700; }
+.rel-texto { font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; }
+.rel-folha h3 { font-size: 13.5px; margin: 14px 0 6px; }
+@media print { .rel-tab tr.nosso td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
