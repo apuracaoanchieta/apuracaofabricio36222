@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <meta name="robots" content="noindex">
+  <title>Resultado oficial (TSE) — Fabricio Petri 36.222</title>
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="pg-tse pg-tse-leitura">
+  <!-- Login -->
+  <div id="tela-login" class="login-pg" hidden>
+    <header class="hero">
+      <a class="voltar" href="partido.html" aria-label="Voltar aos resultados"><span data-voltar></span>Resultados</a>
+      <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+      <p class="sub">Resultado oficial do TSE</p>
+    </header>
+    <form class="card login-card" id="form-login" autocomplete="on">
+      <h1>Digite a senha</h1>
+      <p class="muted small" style="margin:0 0 18px">Senha do Partido/candidato.</p>
+      <div class="campo"><label for="l-senha">Senha de acesso</label>
+        <input class="input" id="l-senha" type="password" autocomplete="current-password" required></div>
+      <div id="l-demo" class="aviso aviso-info small" hidden></div>
+      <button class="btn btn-primario btn-xl" type="submit" id="l-entrar">Entrar</button>
+      <a class="login-voltar" href="partido.html">← Voltar aos resultados</a>
+    </form>
+  </div>
+
+  <!-- Apuração TSE -->
+  <div id="tela-app" hidden>
+    <header class="topbar">
+      <div class="topbar-in">
+        <a class="logo-link" href="partido.html" title="Voltar aos resultados"><img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri 36.222" width="480" height="410"></a>
+        <div class="titulo"><b>Resultado oficial (TSE)</b><span class="oculto-mobile">Somente visualização · Deputado Estadual · Espírito Santo</span></div>
+        <span class="atualizado oculto-mobile" id="t-atualizado"><span class="pulso"></span><span>—</span></span>
+        <a class="btn btn-topo btn-sm btn-topo-txt" href="partido.html" id="btn-voltar" title="Voltar aos resultados"></a>
+      </div>
+    </header>
+    <nav class="abas" aria-label="Seções da Apuração TSE">
+      <div class="abas-in" role="tablist">
+        <button class="aba ativa" data-aba="projecao" role="tab">Situação e projeção</button>
+        <button class="aba" data-aba="eleitos" role="tab">Eleitos</button>
+        <button class="aba" data-aba="graficos" role="tab">Gráficos</button>
+        <button class="aba" data-aba="guia" role="tab">Entenda os números</button>
+      </div>
+    </nav>
+    <main class="wrap-l">
+      <div class="acoes-painel">
+        <a class="btn btn-primario btn-sm" href="telao-tse.html" id="btn-telao-tse" title="Abrir o telão da Apuração TSE"></a>
+      </div>
+      <div id="aviso-parcial"></div>
+      <section data-painel="projecao" id="sec-projecao"></section>
+      <section data-painel="eleitos" id="sec-eleitos" hidden></section>
+      <section data-painel="graficos" id="sec-graficos" hidden></section>
+      <section data-painel="guia" id="sec-guia" hidden></section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/candidatos-tse-es2026.js"></script>
+  <script src="assets/js/tse-demo.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/tse-logica.js"></script>
+  <script>window.TSE_LEITURA = true;</script>
+  <script src="assets/js/tse.js"></script>
+</body>
+</html>

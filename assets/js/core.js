@@ -947,6 +947,18 @@ var Core = (function () {
     };
   };
 
+  /* Consulta SOMENTE LEITURA para o acesso do Partido/candidato (não grava nada) */
+  ACOES['tse.consulta'] = function (db, req) {
+    autenticar(db, req.token, [PERFIS.PARTIDO, PERFIS.APURACAO]);
+    var cfg = lerConfig(db);
+    return {
+      config: configPublica(cfg), tse_atualizado_em: str(cfg.tse_atualizado_em), tse_situacao: str(cfg.tse_situacao),
+      tse_aplicado_em: str(cfg.tse_aplicado_em), tse_pct_secoes: str(cfg.tse_pct_secoes) === '' ? null : Number(cfg.tse_pct_secoes),
+      partidos: mapTsePartidos(db).map(strip), candidatos: mapTseCandidatos(db).map(strip),
+      historico: mapTseHistorico(db).map(strip), agora: db.stamp(), leitura: true
+    };
+  };
+
   /* Busca no TSE e devolve só a PRÉVIA (nada é gravado aqui) */
   ACOES['tse.buscar'] = function (db, req) {
     exigeApuracaoTse(db, req);

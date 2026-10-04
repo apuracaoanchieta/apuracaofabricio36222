@@ -692,3 +692,20 @@ table.tabela { width: 100%; border-collapse: collapse; font-size: 14px; }
 .quanto-falta.ok .qf-destaque b { color: var(--ok); }
 .quanto-falta .resumo-envio .linha > span { min-width: 0; }
 .quanto-falta .resumo-envio .linha > b { white-space: nowrap; }
+/* Resultado oficial do TSE — acesso do Partido (explicações) */
+.dica-tse { display: flex; gap: 10px; align-items: flex-start; background: #eef7fb; border: 1px solid #cfe6f0; color: #0d3a52; border-radius: 12px; padding: 10px 14px; font-size: 13.5px; line-height: 1.5; margin: 12px 0 14px; }
+.dica-tse svg { width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--azul-esc); }
+.dica-tse.compacta { margin: -4px 0 12px; font-size: 13px; padding: 8px 12px; }
+.resumo-simples { margin-top: 14px; padding: 14px 16px; background: #fff7ef; border-radius: 12px; border-left: 4px solid var(--laranja); font-size: 15.5px; line-height: 1.55; }
+.aviso-parcial { margin-bottom: 16px; }
+.aviso-parcial > div > b:first-child { letter-spacing: .3px; }
+.barra-parcial { height: 8px; background: rgba(0, 0, 0, .08); border-radius: 99px; margin: 8px 0 6px; overflow: hidden; max-width: 420px; }
+.barra-parcial i { display: block; height: 100%; background: currentColor; border-radius: 99px; opacity: .75; }
+.guia-tse { margin: 0; padding-left: 22px; }
+.guia-tse li { padding: 12px 0; border-top: 1px solid var(--linha); }
+.guia-tse li:first-child { border-top: 0; padding-top: 0; }
+.guia-tse li::marker { font-weight: 800; color: var(--laranja); }
+.guia-tse h3 { font-size: 15.5px; margin: 0 0 4px; }
+.guia-tse p { margin: 0; line-height: 1.6; color: var(--texto); font-size: 14.5px; }
+.guia-ex { margin-top: 8px; background: #fff7ef; border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.btn-azul.btn-telao-destaque { background: linear-gradient(180deg, #0a8fd0, var(--azul-esc)); color: #fff; }

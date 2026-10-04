@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var $ = App.$, h = App.h, n = App.n;
-  var sess = App.sessao.get('apuracao');
+  var sess = App.sessao.get('apuracao') || App.sessao.get('partido');
   var ultimo = null, timer = null, ocupado = false, valorAtual = 0;
   var params = new URLSearchParams(location.search);
   var vista = params.get('vista') === 'eleitos' ? 'eleitos' : 'fab', alternar = params.get('alternar') === '1', timerAlt = null;
@@ -14,14 +14,14 @@
   function telaLogin() {
     $('#telao').hidden = true; $('#tela-login').hidden = false;
     document.body.style.overflow = 'auto';
-    if (App.DEMO) { var d = $('#l-demo'); d.hidden = false; d.innerHTML = App.ICON.info + '<div>Demonstração: senha <strong>apuracao</strong></div>'; }
+    if (App.DEMO) { var d = $('#l-demo'); d.hidden = false; d.innerHTML = App.ICON.info + '<div>Demonstração: senha <strong>partido</strong></div>'; }
     setTimeout(function () { $('#l-senha').focus({ preventScroll: true }); }, 50);
   }
   $('#form-login').addEventListener('submit', function (e) {
     e.preventDefault();
     var b = $('#l-entrar'); App.carregando(b, true, 'Entrando…');
-    App.api('login', { senha: $('#l-senha').value, perfil: 'APURACAO' }).then(function (r) {
-      sess = { token: r.token, usuario: r.usuario, perfil: r.perfil }; App.sessao.set('apuracao', sess); $('#l-senha').value = ''; iniciar();
+    App.api('login', { senha: $('#l-senha').value, perfil: 'PARTIDO' }).then(function (r) {
+      sess = { token: r.token, usuario: r.usuario, perfil: r.perfil }; App.sessao.set(r.perfil === 'APURACAO' ? 'apuracao' : 'partido', sess); $('#l-senha').value = ''; iniciar();
     }).catch(function (err) { App.toast(err.message, 'erro'); }).then(function () { App.carregando(b, false); });
   });
 
@@ -42,13 +42,13 @@
   function carregar() {
     if (ocupado || !sess) return;
     ocupado = true;
-    App.api('tse.dados', { token: sess.token }).then(function (r) {
+    App.api('tse.consulta', { token: sess.token }).then(function (r) {
       ultimo = r; desenhar(r);
       $('#telao').classList.remove('off');
     }).catch(function (e) {
       $('#telao').classList.add('off');
       $('#t-atualizado').textContent = 'sem conexão — tentando de novo';
-      if (/Sessão|acesso/.test(e.message)) { App.sessao.sair('apuracao'); sess = null; clearInterval(timer); telaLogin(); App.toast(e.message, 'erro'); }
+      if (/Sessão|acesso/.test(e.message)) { ['apuracao', 'partido'].forEach(function (a) { var x = App.sessao.get(a); if (x && x.token === sess.token) App.sessao.sair(a); }); sess = null; clearInterval(timer); telaLogin(); App.toast(e.message, 'erro'); }
     }).then(function () { ocupado = false; });
   }
 
@@ -91,6 +91,8 @@
     $('#t-status').textContent = TEXTO_STATUS[s.chave] || s.label;
     var pctQE = st.QE ? votos / st.QE : 0;
     $('#t-med').style.width = Math.max(0, Math.min(100, pctQE * 100)) + '%';
+    var pS = d.tse_pct_secoes;
+    $('#t-rot-proj').textContent = st.kind !== 'com-dados' ? 'PROJEÇÃO' : (pS !== null && pS !== undefined && !isNaN(pS) ? (pS >= 100 ? 'PROJEÇÃO · 100% APURADO' : 'PROJEÇÃO · ' + Number(pS).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '% APURADO') : 'PROJEÇÃO PARCIAL');
     $('#t-proj-txt').innerHTML = st.kind === 'com-dados'
       ? 'O ' + h(partido) + ' faz <b>' + st.vagasDoPartido + ' vaga' + (st.vagasDoPartido === 1 ? '' : 's') + '</b> de ' + c.vagas +
         ' · cláusula: ' + n(Math.ceil(st.QE * 0.1)) + ' votos'
@@ -162,7 +164,7 @@
   $('#t-voltar').addEventListener('click', function () {
     if (document.fullscreenElement) document.exitFullscreen();
     var veio = document.referrer && document.referrer.indexOf(location.origin) === 0 && !/telao-tse\.html/.test(document.referrer);
-    if (veio && history.length > 1) history.back(); else location.href = 'tse.html';
+    if (veio && history.length > 1) history.back(); else location.href = sess && sess.perfil === 'APURACAO' ? 'tse.html' : 'partido-tse.html';
   });
   document.addEventListener('keydown', function (e) { if ((e.key === 'f' || e.key === 'F') && !$('#telao').hidden) alternarCheia(); });
   document.addEventListener('fullscreenchange', function () { $('#telao').classList.toggle('cheia', !!document.fullscreenElement); });
