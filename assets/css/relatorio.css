@@ -117,3 +117,9 @@
 @media print { .relm-mapa svg path { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .relm-mapa, .relm-mapa-svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 @media (max-width: 720px) { .relm-grade { grid-template-columns: 1fr; } .relm-mapa-svg { height: 110vw; } }
 .rel-tab tr.total td { font-weight: 800; border-top: 1.5px solid #9fb8c6; background: #fff !important; break-inside: avoid; }
+@media print {
+  .rel-kpis.rel-kpis-4 { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+  .relm-grade { grid-template-columns: 1.15fr 1fr; }
+  .relm-mapa-svg { height: 128mm; }
+  .relm-top li { padding: 2.5px 0; }
+}

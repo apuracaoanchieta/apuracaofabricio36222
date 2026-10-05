@@ -238,11 +238,14 @@ var MapaES = (function () {
     var locais = {}, porMun = {};
     v.locais.forEach(function (l) { locais[l.id] = l; });
     function mun(nome) { var k = norm(nome); return porMun[k] || (porMun[k] = { municipio: String(nome).toUpperCase(), votos: 0, secoes: 0, apuradas: 0, aptos: 0, pendentes: 0 }); }
-    v.secoes.forEach(function (s) { var l = locais[s.local_id]; if (!l || !s.ativo) return; var m = mun(l.municipio); m.aptos += Number(s.aptos) || 0; if (!s.agregada_a) m.secoes++; });
+    // seções agregadas não contam como urna (os votos delas estão no boletim da seção principal)
+    var conta = {};
+    v.secoes.forEach(function (s) { var l = locais[s.local_id]; if (!l || !s.ativo) return; var m = mun(l.municipio); m.aptos += Number(s.aptos) || 0; if (!s.agregada_a) { m.secoes++; conta[s.id] = true; } });
     (v.urnas || []).forEach(function (u) {
       var m = mun(u.municipio), vt = Number(u.votos) || 0; m.votos += vt; if (u.status === 'PENDENTE') m.pendentes += vt;
-      if (!/^TOT-/.test(String(u.secao_id || ''))) m.apuradas++;
+      if (conta[u.secao_id]) m.apuradas++;
     });
+    Object.keys(porMun).forEach(function (k) { var m = porMun[k]; if (m.apuradas > m.secoes) m.apuradas = m.secoes; });
     return { config: v.config, municipios: Object.keys(porMun).map(function (k) { return porMun[k]; }), locais: [], agora: v.agora };
   }
 
