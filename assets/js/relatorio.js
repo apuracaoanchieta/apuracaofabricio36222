@@ -30,7 +30,11 @@
     var b = $('#r-atualizar'); App.carregando(b, true, 'Atualizando…');
     $('#rel').innerHTML = '<p class="rel-carregando">Carregando os dados da apuração…</p>';
     return App.api('apuracao.dados', { token: sess.token }).then(function (r) {
-      dados = r; montarFiltros(); desenhar();
+      var primeira = !dados;
+      dados = r;
+      // estado inteiro (milhares de seções): começa pelo resumo; o detalhe por seção fica para um município
+      if (primeira && r.secoes.length > 1500) { opc.detalhe = 'resumo'; var sd = $('#r-detalhe'); if (sd && Array.prototype.some.call(sd.options, function (o) { return o.value === 'resumo'; })) sd.value = 'resumo'; }
+      montarFiltros(); desenhar();
     }).catch(function (e) {
       if (/Sessão|acesso/.test(e.message)) { App.sessao.sair('apuracao'); sess = null; telaLogin(); }
       App.toast(e.message, 'erro');

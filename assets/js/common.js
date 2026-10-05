@@ -51,6 +51,7 @@ var App = (function () {
       update: function (n, row, o) { t[n][row - 2] = linha(n, o); persistir(); },
       remove: function (n, row) { t[n].splice(row - 2, 1); persistir(); },
       replaceAll: function (n, lista) { t[n] = lista.map(function (o) { return linha(n, o); }); persistir(); },
+      appendMany: function (n, lista) { lista.forEach(function (o) { t[n].push(linha(n, o)); }); persistir(); },
       // demonstração: o "TSE" é simulado a partir da lista de candidatos aptos (tse-demo.js)
       demo: true,
       fetchJson: function (url) { return window.TseDemo ? { status: 200, text: JSON.stringify(window.TseDemo.gerar(url)) } : { status: 503, text: '' }; },
@@ -203,6 +204,7 @@ var App = (function () {
   }
 
   var ICON = {
+    mapa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>',
     grafico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v2M12 10v7M17 6v11"/></svg>',
     camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     galeria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>',

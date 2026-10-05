@@ -19,6 +19,7 @@
   $('#ap-excel').innerHTML = ICON.excel + 'Exportar Excel';
   $('#ap-relatorio').innerHTML = ICON.impressora + 'Relatório para impressão';
   $('#ap-tse').innerHTML = ICON.grafico + 'Apuração TSE';
+  $('#ap-mapa').innerHTML = ICON.mapa + 'Mapa dos votos';
   $('#ap-excel').addEventListener('click', function () {
     if (!dados) return App.toast('Aguarde os dados carregarem.', 'erro');
     var b = this; App.carregando(b, true, 'Gerando…');
@@ -280,7 +281,7 @@
       '<div class="resumo-envio" style="margin-bottom:16px">' +
       '<div class="linha"><span>Fiscal</span><b>' + h(l.nome || '—') + '</b></div>' +
       (l.telefone ? '<div class="linha"><span>Telefone</span><b><a href="' + App.whatsapp(l.telefone) + '" target="_blank" rel="noopener">' + App.tel(l.telefone) + '</a></b></div>' : '') +
-      '<div class="linha"><span>Origem</span><b>' + (l.origem === 'APURACAO' ? 'Lançado pela apuração' : 'Fiscal') + '</b></div>' +
+      '<div class="linha"><span>Origem</span><b>' + (l.origem === 'APURACAO' ? 'Lançado pela apuração' : l.origem === 'TSE' ? 'Boletim de urna oficial (TSE)' : 'Fiscal') + '</b></div>' +
       (l.validado_por ? '<div class="linha"><span>' + (l.status === 'REJEITADO' ? 'Rejeitado' : 'Conferido') + ' por</span><b>' + h(l.validado_por) + ' · ' + App.hora(l.validado_em) + '</b></div>' : '') +
       (l.obs ? '<div class="linha"><span>Observação</span><b>' + h(l.obs) + '</b></div>' : '') +
       '</div>' +
@@ -357,16 +358,16 @@
         '<div class="filtro"><label for="lf-status">Status</label><select class="input" id="lf-status"><option value="TODOS">Todos</option><option value="PENDENTE">Em conferência</option><option value="VALIDADO">Confirmados</option><option value="REJEITADO">Rejeitados</option><option value="DESCARTADO">Substituídos</option></select></div>' +
         '<div class="filtro"><label for="lf-mun">Município</label><select class="input" id="lf-mun"></select></div>' +
         '<div class="filtro filtro-largo"><label for="lf-local">Local de votação</label><select class="input" id="lf-local"></select></div>' +
-        '<div class="filtro"><label for="lf-origem">Origem</label><select class="input" id="lf-origem"><option value="">Todas</option><option value="FISCAL">Fiscais</option><option value="APURACAO">Lançados pela apuração</option></select></div>' +
+        '<div class="filtro"><label for="lf-origem">Origem</label><select class="input" id="lf-origem"><option value="">Todas</option><option value="FISCAL">Fiscais</option><option value="APURACAO">Lançados pela apuração</option><option value="TSE">Boletim de urna (TSE)</option></select></div>' +
         '<div class="filtro"><label for="lf-ordem">Ordenar</label><select class="input" id="lf-ordem"><option value="recentes">Mais recentes</option><option value="antigos">Mais antigos</option><option value="maior">Mais votos</option><option value="menor">Menos votos</option><option value="secao">Nº da seção</option></select></div>' +
         '<button class="btn btn-ghost btn-sm filtro-limpar" id="lf-limpar" type="button" hidden>Limpar filtros</button></div>' +
         '<div class="card" style="padding:12px 16px"><div class="muted small" id="lf-total" style="margin:4px 0 8px"></div><div class="tabela-wrap"><table class="tabela responsiva" id="lf-tabela"></table></div></div>';
-      $('#lf-busca', el).addEventListener('input', function () { filtros.busca = this.value; desenharTabela(); });
-      $('#lf-status', el).addEventListener('change', function () { filtros.status = this.value; desenharTabela(); });
+      $('#lf-busca', el).addEventListener('input', function () { filtros.busca = this.value; limiteTabela = 300; desenharTabela(); });
+      $('#lf-status', el).addEventListener('change', function () { filtros.status = this.value; limiteTabela = 300; desenharTabela(); });
       $('#lf-mun', el).addEventListener('change', function () { filtros.mun = this.value; filtros.local = ''; renderLancamentos(); });
-      $('#lf-local', el).addEventListener('change', function () { filtros.local = this.value; desenharTabela(); });
-      $('#lf-origem', el).addEventListener('change', function () { filtros.origem = this.value; desenharTabela(); });
-      $('#lf-ordem', el).addEventListener('change', function () { filtros.ordem = this.value; desenharTabela(); });
+      $('#lf-local', el).addEventListener('change', function () { filtros.local = this.value; limiteTabela = 300; desenharTabela(); });
+      $('#lf-origem', el).addEventListener('change', function () { filtros.origem = this.value; limiteTabela = 300; desenharTabela(); });
+      $('#lf-ordem', el).addEventListener('change', function () { filtros.ordem = this.value; limiteTabela = 300; desenharTabela(); });
       $('#lf-limpar', el).addEventListener('click', function () {
         filtros.busca = ''; filtros.status = 'TODOS'; filtros.mun = ''; filtros.local = ''; filtros.origem = '';
         $('#lf-busca', el).value = ''; $('#lf-origem', el).value = ''; renderLancamentos();
@@ -382,6 +383,7 @@
     $('#lf-ordem', el).value = filtros.ordem;
     desenharTabela();
   }
+  var limiteTabela = 300;
   function desenharTabela() {
     var q = Core.norm(filtros.busca);
     var lista = dados.lancamentos.filter(function (l) {
@@ -401,6 +403,9 @@
     $('#lf-limpar').hidden = !(filtros.busca || filtros.status !== 'TODOS' || filtros.mun || filtros.local || filtros.origem);
     var soma = 0; lista.forEach(function (l) { if (typeof l.votos === 'number') soma += l.votos; });
     $('#lf-total').textContent = lista.length + ' envio' + (lista.length === 1 ? '' : 's') + (filtros.status !== 'TODOS' ? ' · ' + App.n(soma) + ' votos' : '');
+    // com o estado inteiro são milhares de envios: mostra 300 por vez
+    var total = lista.length, cortados = total > limiteTabela ? total - limiteTabela : 0;
+    if (cortados) lista = lista.slice(0, limiteTabela);
     $('#lf-tabela').innerHTML = '<thead><tr><th>Hora</th><th>Local</th><th class="r">Seção</th><th class="r">Votos</th><th>Fiscal</th><th>Status</th><th></th></tr></thead><tbody>' +
       (lista.length ? lista.map(function (l) {
         var corr = corrigido(l);
@@ -412,7 +417,9 @@
           '<td data-l="Fiscal">' + h(l.nome) + (l.origem === 'APURACAO' ? ' <span class="tiny muted">(manual)</span>' : '') + '</td>' +
           '<td data-l="Status">' + selo(l.status) + '</td>' +
           '<td data-l=""><button class="btn btn-sec btn-sm" data-abrir="' + l.id + '">Abrir</button></td></tr>';
-      }).join('') : '<tr><td colspan="7" class="vazio">Nenhum envio encontrado.</td></tr>') + '</tbody>';
+      }).join('') : '<tr><td colspan="7" class="vazio">Nenhum envio encontrado.</td></tr>') +
+      (cortados ? '<tr><td colspan="7" class="centro"><button class="btn btn-sec btn-sm" id="lf-mais">Mostrar mais ' + Math.min(cortados, 300) + ' (faltam ' + App.n(cortados) + ')</button></td></tr>' : '') + '</tbody>';
+    var mais = $('#lf-mais'); if (mais) mais.onclick = function () { limiteTabela += 300; desenharTabela(); };
     $$('#lf-tabela [data-abrir]').forEach(function (b) { b.onclick = function () { abrirConferencia(b.dataset.abrir); }; });
   }
 

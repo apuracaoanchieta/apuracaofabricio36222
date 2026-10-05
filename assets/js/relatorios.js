@@ -100,7 +100,7 @@ var Relat = (function () {
       // 4. Todos os envios (histórico completo)
       var te = cab.concat([['ID', 'Recebido em', 'Origem', 'Fiscal / quem informou', 'Telefone', 'Município', 'Local de votação', 'Seção', 'Votos', 'Votos informados pelo fiscal', 'Status', 'Conferido por', 'Conferido em', 'Observação', 'Foto do BU']]);
       d.lancamentos.slice().sort(function (a, b) { return a.recebido_em < b.recebido_em ? -1 : 1; }).forEach(function (l) {
-        te.push([l.id, dataBr(l.recebido_em), l.origem === 'APURACAO' ? 'Lançado pela apuração' : 'Fiscal', l.nome, App.tel(l.telefone), l.municipio,
+        te.push([l.id, dataBr(l.recebido_em), l.origem === 'APURACAO' ? 'Lançado pela apuração' : l.origem === 'TSE' ? 'Boletim de urna (TSE)' : 'Fiscal', l.nome, App.tel(l.telefone), l.municipio,
           l.local || (Core.ehTotal(l) ? 'TOTAL DO MUNICÍPIO' : ''), Core.ehTotal(l) ? 'TOTAL' : (Number(l.secao) || l.secao),
           typeof l.votos === 'number' ? l.votos : '', typeof l.votos_informados === 'number' ? l.votos_informados : '', ROT[l.status] || l.status,
           l.validado_por, dataBr(l.validado_em), l.obs, linkFoto(l.foto_id)]);

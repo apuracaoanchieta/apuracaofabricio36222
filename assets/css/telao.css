@@ -179,3 +179,32 @@
 .telao-tse .t-bloqueio[hidden] { display: none; }
 .telao-tse .t-bloqueio b { font-size: clamp(24px, 6vh, 80px); font-weight: 900; line-height: 1.1; }
 .telao-tse .t-bloqueio span { font-size: clamp(14px, 2.6vh, 36px); font-weight: 600; opacity: .9; }
+
+/* ===== Telão do mapa dos votos ===== */
+.telao-mapa { grid-template-rows: auto 1fr auto; }
+.tm-corpo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 2.4vw; min-height: 0; }
+.tm-mapa-box { position: relative; z-index: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; border-radius: 3vh; padding: 1.6vh 1.4vw; box-shadow: 0 2vh 5vh rgba(0, 40, 70, .18); }
+.tm-mapa { flex: 1; min-height: 0; position: relative; }
+.tm-legenda { display: flex; flex-wrap: wrap; gap: .6vh 1.2vw; justify-content: center; color: var(--texto-2); font-weight: 700; font-size: clamp(10px, 1.5vh, 20px); margin-top: .8vh; }
+.tm-legenda span { display: inline-flex; align-items: center; gap: .5vw; }
+.tm-legenda i { width: 1.8vh; height: 1.8vh; border-radius: .4vh; display: inline-block; }
+.tm-legenda i.zero { background: repeating-linear-gradient(45deg, #e9eef1 0 3px, #c9d3d9 3px 4.5px); }
+.tm-lado { display: grid; grid-template-rows: auto 1fr; gap: 2vh; min-height: 0; }
+.tm-total, .tm-rank { background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); border-radius: 3vh; backdrop-filter: blur(6px); padding: 2.4vh 2vw; min-width: 0; min-height: 0; }
+.tm-total .t-numero { font-size: clamp(50px, 15vh, 220px); color: #fff; text-shadow: 0 .6vh 2vh rgba(0, 50, 80, .3); }
+.tm-total .t-sub b { color: #fff; }
+.tm-rank { overflow: hidden; display: flex; flex-direction: column; }
+.tm-rank ol { list-style: none; margin: 1.2vh 0 0; padding: 0; display: flex; flex-direction: column; gap: .9vh; min-height: 0; overflow: hidden; }
+.tm-rank li { display: grid; grid-template-columns: 3.4vh minmax(0, 1fr) auto; gap: 1vw; align-items: center; font-size: clamp(12px, 2.3vh, 32px); font-weight: 800; }
+.tm-rank li .p { opacity: .7; font-size: .8em; text-align: right; }
+.tm-rank li .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-rank li .nm i { display: block; height: .6vh; border-radius: .6vh; background: rgba(255, 255, 255, .22); margin-top: .5vh; overflow: hidden; }
+.tm-rank li .nm i b { display: block; height: 100%; background: var(--amarelo); border-radius: .6vh; }
+.tm-rank li .v { font-variant-numeric: tabular-nums; }
+.tm-rank li.atual { background: rgba(255, 255, 255, .18); border-radius: 1.2vh; padding: .4vh .6vw; margin: -.4vh -.6vw; }
+.telao-mapa .mes-dica { font-size: clamp(12px, 1.8vh, 22px); }
+.telao-mapa .mes-dica b { font-size: 1.1em; }
+@media (orientation: portrait) {
+  .tm-corpo { grid-template-columns: 1fr; }
+  .tm-mapa-box { min-height: 55vh; }
+}

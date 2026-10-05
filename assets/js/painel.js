@@ -55,8 +55,9 @@ var Painel = (function () {
     /* Seções AGREGADAS pelo TSE: os votos (e os eleitores) da agregada entram no BU da seção principal.
      * Para as contas de "% dos aptos", os aptos da agregada passam para a principal. */
     var secPorNum = {}, agregadasDe = {};
-    dados.secoes.forEach(function (s) { var l = locais[s.local_id]; if (l) secPorNum[Core.norm(l.municipio) + '#' + s.numero] = s; });
-    function principalDe(s) { var l = locais[s.local_id]; return s.agregada_a && l ? secPorNum[Core.norm(l.municipio) + '#' + s.agregada_a] || null : null; }
+    function chaveNum(l, s, num) { return Core.norm(l.municipio) + '#' + (s.zona || l.zona || '') + '#' + num; }
+    dados.secoes.forEach(function (s) { var l = locais[s.local_id]; if (l) secPorNum[chaveNum(l, s, s.numero)] = s; });
+    function principalDe(s) { var l = locais[s.local_id]; return s.agregada_a && l ? secPorNum[chaveNum(l, s, s.agregada_a)] || null : null; }
     dados.secoes.forEach(function (s) {
       var p = principalDe(s); if (!p || !s.ativo) return;
       aptosEf[p.id] = (aptosEf[p.id] || 0) + aptosSec[s.id]; aptosEf[s.id] = 0;
@@ -158,7 +159,7 @@ var Painel = (function () {
       '<section class="card"><div class="card-titulo"><h3>Votos ao longo do tempo</h3><span class="muted tiny">acumulado</span></div><div class="grafico" style="height:260px"><canvas id="g-ritmo" aria-label="Gráfico de votos acumulados ao longo do tempo" role="img"></canvas></div></section>' +
       '<section class="card"><div class="card-titulo"><h3>Urnas</h3><span class="muted tiny" id="p-urnas-txt"></span></div><div class="grafico" style="height:260px"><canvas id="g-urnas" aria-label="Gráfico de urnas apuradas" role="img"></canvas></div></section>' +
       '</div>' +
-      '<section class="card" style="margin-top:16px"><div class="card-titulo"><h3>Votos por local de votação</h3><span class="muted tiny">ordenado pelo total</span></div><div class="grafico" id="g-locais-box"><canvas id="g-locais" aria-label="Gráfico de votos por local de votação" role="img"></canvas></div></section>' +
+      '<section class="card" style="margin-top:16px"><div class="card-titulo"><h3 id="g-locais-tit">Votos por local de votação</h3><span class="muted tiny">ordenado pelo total</span></div><div class="grafico" id="g-locais-box"><canvas id="g-locais" aria-label="Gráfico de votos por local de votação" role="img"></canvas></div></section>' +
       '<section class="card"><div class="card-titulo"><h3>Mapa das urnas</h3><span class="muted tiny">número da seção e votos</span></div><div class="mapa" id="p-mapa"></div></section>' +
       '<section class="card"><div class="card-titulo"><h3>Resumo por local</h3></div><div class="tabela-wrap"><table class="tabela responsiva" id="p-tabela"></table></div></section>';
 
@@ -195,7 +196,8 @@ var Painel = (function () {
       var principal = String(cfg.municipio_principal || 'ANCHIETA').toUpperCase();
       var muns = {}; muns[principal] = true;
       dados.urnas.forEach(function (u) { if (u.municipio) muns[u.municipio.toUpperCase()] = true; });
-      dados.locais.forEach(function (l) { if (l.municipio && dados.secoes.some(function (s) { return s.local_id === l.id && s.ativo; })) muns[l.municipio.toUpperCase()] = true; });
+      var comSecao = {}; dados.secoes.forEach(function (s) { if (s.ativo) comSecao[s.local_id] = true; });
+      dados.locais.forEach(function (l) { if (l.municipio && comSecao[l.id]) muns[l.municipio.toUpperCase()] = true; });
       var lista = Object.keys(muns).sort(function (a, b) { return a === principal ? -1 : b === principal ? 1 : a.localeCompare(b, 'pt-BR'); });
       if (!municipio) municipio = principal;
       var sel = $('#p-mun', raiz);
@@ -219,12 +221,12 @@ var Painel = (function () {
       if (st.outros.length && municipio !== '__TODOS__') {
         var tot = st.outros.reduce(function (a, o) { return a + o.votos; }, 0);
         outros.innerHTML = '<div class="aviso aviso-info">' + ICON.info + '<div><b>Outros municípios: ' + App.n(tot) + ' votos</b>' +
-          st.outros.map(function (o) {
+          st.outros.slice().sort(function (a, b) { return b.votos - a.votos; }).slice(0, 6).map(function (o) {
             var partes = [];
             if (o.urnas) partes.push(o.urnas + ' urna' + (o.urnas > 1 ? 's' : ''));
             if (o.totais) partes.push(o.totais > 1 ? o.totais + ' totais informados' : 'total informado');
             return h(o.municipio) + ' ' + App.n(o.votos) + ' (' + partes.join(' + ') + ')';
-          }).join(' · ') +
+          }).join(' · ') + (st.outros.length > 6 ? ' · e mais ' + (st.outros.length - 6) + ' municípios' : '') +
           '. Escolha "Todos os municípios" para somar.</div></div>';
       } else outros.innerHTML = '';
 
@@ -335,8 +337,16 @@ var Painel = (function () {
       graficos.urnas.$pctTxt = App.pct(st.apuradas, st.totalUrnas); graficos.urnas.draw();
 
       // 3) Votos por local (barras horizontais empilhadas)
-      var ls = st.locais.filter(function (l) { return l.val + l.pen > 0 || l.total > 0; })
-        .sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+      var ls = st.locais.filter(function (l) { return l.val + l.pen > 0 || l.total > 0; });
+      if (municipio === '__TODOS__') {
+        // estado inteiro: uma barra por município
+        ls = porMunicipio(ls);
+      }
+      ls.sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); });
+      var ocultos = ls.length > 40 ? ls.length - 40 : 0;
+      if (ocultos) ls = ls.slice(0, 40);
+      var tLoc = $('#g-locais-tit', raiz);
+      if (tLoc) tLoc.textContent = (municipio === '__TODOS__' ? 'Votos por município' : 'Votos por local de votação') + (ocultos ? ' — os 40 maiores' : '');
       var altura = Math.max(160, ls.length * 30 + 50);
       $('#g-locais-box', raiz).style.height = altura + 'px';
       var ctxL = $('#g-locais', raiz).getContext('2d');
@@ -376,6 +386,10 @@ var Painel = (function () {
     function desenharMapa(st) {
       var ls = st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); })
         .filter(function (l) { return l.secoes.some(passaSituacao) || (l.totalInformado && (situacao === 'TODAS' || situacao === l.totalStatus)); });
+      if (municipio === '__TODOS__' && ls.length > 80) {
+        $('#p-mapa', raiz).innerHTML = '<div class="vazio">São ' + App.n(ls.length) + ' locais de votação no estado. Escolha um município no filtro acima para ver as urnas.</div>';
+        return;
+      }
       var dups = opcoes.duplicadas ? opcoes.duplicadas() : {};
       $('#p-mapa', raiz).innerHTML = ls.length ? ls.map(function (l) {
         return '<div class="mapa-local"><div class="cab"><b>' + h(l.nome) + '</b><span>' + (l.total ? (l.val + l.pen) + '/' + l.total : 'total') + '</span></div><div class="chips">' +
@@ -404,8 +418,20 @@ var Painel = (function () {
       if (opcoes.aoClicarSecao) App.$$('[data-secao]', raiz).forEach(function (b) { b.onclick = function () { opcoes.aoClicarSecao(b.dataset.secao); }; });
     }
 
+    /* estado inteiro: soma os locais por município (tabela e gráfico ficam com 78 linhas em vez de milhares) */
+    function porMunicipio(locaisSt) {
+      var pm = {};
+      locaisSt.forEach(function (l) {
+        var m = pm[l.municipio] || (pm[l.municipio] = { nome: l.municipio, municipio: l.municipio, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, totalInformado: 0, aptos: 0, aptosApur: 0, votosSec: 0, secoes: [] });
+        ['total', 'val', 'pen', 'votosVal', 'votosPen', 'totalInformado', 'aptos', 'aptosApur', 'votosSec'].forEach(function (k) { m[k] += l[k] || 0; });
+        m.secoes = m.secoes.concat(l.secoes);
+        if (l.totalInformado) m.totalStatus = l.totalStatus;
+      });
+      return Object.keys(pm).map(function (k) { return pm[k]; });
+    }
     function desenharTabela(st) {
-      var ls = st.locais.slice().sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); })
+      var todosMun = municipio === '__TODOS__';
+      var ls = (todosMun ? porMunicipio(st.locais) : st.locais).slice().sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); })
         .filter(function (l) { return l.secoes.some(passaSituacao) || (l.totalInformado && (situacao === 'TODAS' || situacao === l.totalStatus)); });
       var t = { total: 0, val: 0, pen: 0, vv: 0, vp: 0 };
       var comAptos = st.aptosTotal > 0;
@@ -421,7 +447,8 @@ var Painel = (function () {
           (comAptos ? '<td data-l="Eleitores" class="r">' + (l.aptos ? App.n(l.aptos) : '—') + '</td>' +
             '<td data-l="% dos aptos" class="r" title="Votos nas seções apuradas ÷ eleitores aptos dessas seções"><b>' + (l.aptosApur ? App.pct(l.votosSec, l.aptosApur) : '—') + '</b></td>' : '') + '</tr>';
       }).join('');
-      $('#p-tabela', raiz).innerHTML = '<thead><tr><th>Local</th><th class="r">Urnas</th><th>Progresso</th><th class="r">Confirmados</th><th class="r">Em conferência</th><th class="r">Média/urna</th>' +
+      var tt = $('#p-tabela', raiz).closest('.card').querySelector('h3'); if (tt) tt.textContent = todosMun ? 'Resumo por município' : 'Resumo por local';
+      $('#p-tabela', raiz).innerHTML = '<thead><tr><th>' + (todosMun ? 'Município' : 'Local') + '</th><th class="r">Urnas</th><th>Progresso</th><th class="r">Confirmados</th><th class="r">Em conferência</th><th class="r">Média/urna</th>' +
         (comAptos ? '<th class="r">Eleitores</th><th class="r" title="Votos ÷ eleitores aptos das seções apuradas">% dos aptos</th>' : '') + '</tr></thead><tbody>' + corpo + '</tbody>' +
         '<tfoot><tr><td data-l="Total">Total</td><td data-l="Urnas" class="r">' + (t.val + t.pen) + '/' + t.total + '</td><td class="oculto-mobile"></td><td data-l="Confirmados" class="r">' + App.n(t.vv) + '</td><td data-l="Em conferência" class="r">' + App.n(t.vp) + '</td><td data-l="Média/urna" class="r">' + ((t.val + t.pen) ? App.n(Math.round(st.media)) : '—') + '</td>' +
         (comAptos ? '<td data-l="Eleitores" class="r">' + App.n(st.aptosTotal) + '</td><td data-l="% dos aptos" class="r">' + (st.aptosApur ? App.pct(st.votosSecComAptos, st.aptosApur) : '—') + '</td>' : '') + '</tr></tfoot>';

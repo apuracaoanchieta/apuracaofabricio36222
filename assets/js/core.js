@@ -15,8 +15,8 @@ var Core = (function () {
   /* ------------------------------------------------------------------ */
   var SCHEMA = {
     CONFIG: ['chave', 'valor', 'descricao'],
-    LOCAIS: ['id', 'municipio', 'nome', 'ativo'],
-    SECOES: ['id', 'local_id', 'numero', 'ativo', 'aptos', 'agregada_a'],
+    LOCAIS: ['id', 'municipio', 'nome', 'ativo', 'zona', 'nr_local', 'lat', 'lng', 'endereco', 'bairro'],
+    SECOES: ['id', 'local_id', 'numero', 'ativo', 'aptos', 'agregada_a', 'zona'],
     LANCAMENTOS: ['id', 'client_id', 'recebido_em', 'origem', 'nome', 'telefone', 'municipio',
       'local_id', 'local', 'secao_id', 'secao', 'votos', 'votos_informados', 'foto_id',
       'status', 'validado_por', 'validado_em', 'obs'],
@@ -226,17 +226,24 @@ var Core = (function () {
 
   function mapLocais(db) {
     return db.read('LOCAIS').map(function (r) {
-      return { id: str(r.id), municipio: str(r.municipio).toUpperCase(), nome: str(r.nome), ativo: bool(r.ativo), _row: r._row };
+      var la = parseFloat(String(r.lat).replace(',', '.')), lo = parseFloat(String(r.lng).replace(',', '.'));
+      return { id: str(r.id), municipio: str(r.municipio).toUpperCase(), nome: str(r.nome), ativo: bool(r.ativo),
+        zona: str(r.zona) ? String(int(r.zona)) : '', nr_local: str(r.nr_local) ? String(int(r.nr_local)) : '',
+        lat: isFinite(la) && la !== 0 ? la : null, lng: isFinite(lo) && lo !== 0 ? lo : null, endereco: str(r.endereco), bairro: str(r.bairro), _row: r._row };
     });
   }
   function mapSecoes(db) {
     return db.read('SECOES').map(function (r) {
       var ap = int(r.aptos);
       var ag = int(r.agregada_a);
-      return { id: str(r.id), local_id: str(r.local_id), numero: str(r.numero), ativo: bool(r.ativo), aptos: isNaN(ap) || ap < 0 ? 0 : ap, agregada_a: isNaN(ag) || ag <= 0 ? '' : String(ag), _row: r._row };
+      return { id: str(r.id), local_id: str(r.local_id), numero: str(r.numero), ativo: bool(r.ativo), aptos: isNaN(ap) || ap < 0 ? 0 : ap, agregada_a: isNaN(ag) || ag <= 0 ? '' : String(ag), zona: str(r.zona) ? String(int(r.zona)) : '', _row: r._row };
     });
   }
-  function rowSec(s) { return { id: s.id, local_id: s.local_id, numero: s.numero, ativo: s.ativo ? 'TRUE' : 'FALSE', aptos: s.aptos ? String(s.aptos) : '', agregada_a: s.agregada_a ? String(s.agregada_a) : '' }; }
+  function rowSec(s) { return { id: s.id, local_id: s.local_id, numero: s.numero, ativo: s.ativo ? 'TRUE' : 'FALSE', aptos: s.aptos ? String(s.aptos) : '', agregada_a: s.agregada_a ? String(s.agregada_a) : '', zona: s.zona ? String(s.zona) : '' }; }
+  function rowLocal(l) {
+    return { id: l.id, municipio: l.municipio, nome: l.nome, ativo: l.ativo === false || l.ativo === 'FALSE' ? 'FALSE' : 'TRUE', zona: l.zona || '', nr_local: l.nr_local || '',
+      lat: l.lat === null || l.lat === undefined || l.lat === '' ? '' : String(l.lat), lng: l.lng === null || l.lng === undefined || l.lng === '' ? '' : String(l.lng), endereco: l.endereco || '', bairro: l.bairro || '' };
+  }
   /* Seções AGREGADAS pelo TSE em Anchieta (eleição 2026): seção agregada → seção principal.
    * Os votos da agregada vêm somados no boletim de urna (BU) da principal. */
   var AGREGADAS_SEED = { 72: 22, 75: 16, 76: 24, 78: 15, 144: 17, 171: 68, 173: 40 };
@@ -422,6 +429,44 @@ var Core = (function () {
     };
   };
 
+  /* ---------- Mapa de votos (Apuração, candidato e telão) ----------
+   * Já devolve somado por local de votação e por município, para o mapa carregar rápido. */
+  ACOES['mapa.dados'] = function (db, req) {
+    autenticar(db, req.token, [PERFIS.PARTIDO, PERFIS.APURACAO]);
+    var cfg = lerConfig(db);
+    var locais = {}; mapLocais(db).forEach(function (l) { locais[l.id] = l; });
+    var porLocal = {}, porMun = {};
+    function mun(nome) { var k = norm(nome); return porMun[k] || (porMun[k] = { municipio: str(nome).toUpperCase(), votos: 0, secoes: 0, apuradas: 0, aptos: 0, locais: 0, pendentes: 0 }); }
+    function loc(l) {
+      return porLocal[l.id] || (porLocal[l.id] = { id: l.id, municipio: l.municipio, nome: l.nome, bairro: l.bairro, zona: l.zona, lat: l.lat, lng: l.lng, votos: 0, secoes: 0, apuradas: 0, aptos: 0 });
+    }
+    var secLocal = {};
+    mapSecoes(db).forEach(function (s) {
+      var l = locais[s.local_id]; if (!l || !s.ativo) return;
+      secLocal[s.id] = l;
+      var o = loc(l), m = mun(l.municipio);
+      o.aptos += s.aptos; m.aptos += s.aptos;
+      if (!s.agregada_a) { o.secoes++; m.secoes++; }
+    });
+    var urnas = resolverUrnas(mapLancamentos(db));
+    Object.keys(urnas).forEach(function (k) {
+      var u = urnas[k], v = isNaN(u.votos) ? 0 : u.votos, m = mun(u.municipio);
+      m.votos += v; if (u.status === STATUS.PENDENTE) m.pendentes += v;
+      var l = locais[u.local_id] || secLocal[u.secao_id];
+      if (l) { var o = loc(l); o.votos += v; if (!ehTotalId(u.secao_id)) o.apuradas++; }
+      if (!ehTotalId(u.secao_id)) m.apuradas++;
+    });
+    var ls = Object.keys(porLocal).map(function (k) { return porLocal[k]; });
+    ls.forEach(function (o) { mun(o.municipio).locais++; });
+    return {
+      config: configPublica(cfg),
+      municipios: Object.keys(porMun).map(function (k) { return porMun[k]; }),
+      locais: ls.map(function (o) { return [o.id, o.municipio, o.nome, o.bairro || '', o.lat, o.lng, o.votos, o.secoes, o.apuradas, o.aptos, o.zona || '']; }),
+      agora: db.stamp()
+    };
+  };
+  function ehTotalId(id) { return /^TOT-/.test(String(id || '')); }
+
   /* ---------- Apuração ---------- */
   function exigeApuracao(db, req) { return autenticar(db, req.token, [PERFIS.APURACAO]); }
 
@@ -575,7 +620,7 @@ var Core = (function () {
       if (req.id) {
         var l = find(locais, function (x) { return x.id === str(req.id); });
         if (!l) throw erro('Local não encontrado.');
-        db.update('LOCAIS', l._row, { id: l.id, municipio: mun, nome: nome, ativo: req.ativo === false ? 'FALSE' : 'TRUE' });
+        db.update('LOCAIS', l._row, rowLocal(Object.assign({}, l, { municipio: mun, nome: nome, ativo: req.ativo !== false })));
         log(db, u.usuario, 'EDITAR_LOCAL', l.id + ' ' + nome);
         return { id: l.id };
       }
@@ -612,7 +657,10 @@ var Core = (function () {
       var secoes = mapSecoes(db);
       var locaisMun = {};
       mapLocais(db).forEach(function (l) { if (norm(l.municipio) === norm(local.municipio)) locaisMun[l.id] = l; });
-      var conflito = find(secoes, function (s) { return locaisMun[s.local_id] && s.numero === String(num) && s.id !== str(req.id); });
+      // em municípios com mais de uma zona eleitoral o número da seção se repete: compara também a zona
+      var zonaNova = local.zona || '';
+      function mesmaZona(s) { var z = s.zona || (locaisMun[s.local_id] && locaisMun[s.local_id].zona) || ''; return !z || !zonaNova || z === zonaNova; }
+      var conflito = find(secoes, function (s) { return locaisMun[s.local_id] && s.numero === String(num) && s.id !== str(req.id) && mesmaZona(s); });
       if (conflito) throw erro('A seção ' + num + ' já está cadastrada em ' + locaisMun[conflito.local_id].nome + '.');
       var aptos = null;
       if (req.aptos !== undefined && req.aptos !== null) {
@@ -625,7 +673,7 @@ var Core = (function () {
         if (agregada !== '') {
           if (isNaN(agregada) || agregada <= 0) throw erro('Número da seção principal inválido.');
           if (agregada === num) throw erro('A seção não pode ser agregada a ela mesma.');
-          var princ = find(secoes, function (s) { return locaisMun[s.local_id] && s.numero === String(agregada); });
+          var princ = find(secoes, function (s) { return locaisMun[s.local_id] && s.numero === String(agregada) && mesmaZona(s); });
           if (!princ) throw erro('A seção ' + agregada + ' não está cadastrada em ' + local.municipio + '.');
           if (princ.agregada_a) throw erro('A seção ' + agregada + ' também está marcada como agregada. Escolha a seção principal.');
           agregada = String(agregada);
@@ -634,12 +682,12 @@ var Core = (function () {
       if (req.id) {
         var s = find(secoes, function (x) { return x.id === str(req.id); });
         if (!s) throw erro('Seção não encontrada.');
-        db.update('SECOES', s._row, rowSec({ id: s.id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos === null ? s.aptos : aptos, agregada_a: agregada === null ? s.agregada_a : agregada }));
+        db.update('SECOES', s._row, rowSec(Object.assign({}, s, { local_id: local.id, numero: String(num), zona: zonaNova || s.zona, ativo: req.ativo !== false, aptos: aptos === null ? s.aptos : aptos, agregada_a: agregada === null ? s.agregada_a : agregada })));
         log(db, u.usuario, 'EDITAR_SECAO', s.id + ' nº ' + num);
         return { id: s.id };
       }
       var id = 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
-      db.append('SECOES', rowSec({ id: id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos || 0, agregada_a: agregada || '' }));
+      db.append('SECOES', rowSec({ id: id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos || 0, agregada_a: agregada || '', zona: zonaNova }));
       log(db, u.usuario, 'CRIAR_SECAO', id + ' nº ' + num + ' em ' + local.nome);
       return { id: id };
     });
@@ -727,7 +775,7 @@ var Core = (function () {
       novos.forEach(function (nv) {
         if (nv.id) {
           var l = idsMun[nv.id];
-          db.update('LOCAIS', l._row, { id: l.id, municipio: l.municipio, nome: nv.nome, ativo: 'TRUE' });
+          db.update('LOCAIS', l._row, rowLocal(Object.assign({}, l, { nome: nv.nome, ativo: true })));
         } else {
           nv.id = 'L' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
           db.append('LOCAIS', { id: nv.id, municipio: mun, nome: nv.nome, ativo: 'TRUE' });
@@ -739,11 +787,11 @@ var Core = (function () {
           var s = secPorNum[n];
           localNovoDaSecao[n] = nv;
           if (!s) db.append('SECOES', rowSec({ id: 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase(), local_id: nv.id, numero: n, ativo: true, aptos: 0 }));
-          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: nv.id, numero: s.numero, ativo: true, aptos: s.aptos, agregada_a: s.agregada_a }));
+          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, rowSec(Object.assign({}, s, { local_id: nv.id, ativo: true })));
         });
       });
-      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: s.local_id, numero: s.numero, ativo: false, aptos: s.aptos, agregada_a: s.agregada_a })); });
-      locais.forEach(function (l) { if (!usados[l.id] && l.ativo) db.update('LOCAIS', l._row, { id: l.id, municipio: l.municipio, nome: l.nome, ativo: 'FALSE' }); });
+      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, rowSec(Object.assign({}, s, { ativo: false }))); });
+      locais.forEach(function (l) { if (!usados[l.id] && l.ativo) db.update('LOCAIS', l._row, rowLocal(Object.assign({}, l, { ativo: false }))); });
       // mantém os envios já registrados apontando para o local/nome certos
       var nomePorId = {}; novos.forEach(function (nv) { nomePorId[nv.id] = nv.nome; });
       mapLancamentos(db).forEach(function (lc) {
@@ -788,6 +836,125 @@ var Core = (function () {
   };
 
   /* Eleitores aptos em lote: uma linha por seção, "SEÇÃO;APTOS" (cabeçalhos são ignorados) */
+  /* ---------- Resultado oficial do TSE por seção (estado inteiro) ----------
+   * Recebe UM município por chamada: locais de votação (com coordenadas) e as seções com os votos do
+   * candidato lidos no boletim de urna. Pode rodar de novo: atualiza em vez de duplicar.
+   * modo 'coordenadas' (Anchieta): só completa zona/endereço/coordenadas dos locais já cadastrados. */
+  function gravarEmLote(db, nome, lista) {
+    if (!lista.length) return;
+    if (db.appendMany) db.appendMany(nome, lista); else lista.forEach(function (o) { db.append(nome, o); });
+  }
+  function mudou(a, b) { for (var k in b) if (String(a[k] === undefined || a[k] === null ? '' : a[k]) !== String(b[k] === undefined || b[k] === null ? '' : b[k])) return true; return false; }
+  ACOES['apuracao.importarTse'] = function (db, req) {
+    var u = exigeApuracao(db, req);
+    var mun = str(req.municipio).toUpperCase(), M = norm(mun);
+    if (!M) throw erro('Informe o município.');
+    var lista = Array.isArray(req.locais) ? req.locais : [];
+    if (!lista.length) throw erro('Nenhum local de votação recebido.');
+    var modo = req.modo === 'coordenadas' ? 'coordenadas' : 'completo';
+    return db.lock(function () {
+      var locais = mapLocais(db).filter(function (l) { return norm(l.municipio) === M; });
+      var locById = {}; locais.forEach(function (l) { locById[l.id] = l; });
+      var secoes = mapSecoes(db).filter(function (s) { return locById[s.local_id]; });
+      var res = { municipio: mun, locaisNovos: 0, locaisAtualizados: 0, secoesNovas: 0, secoesAtualizadas: 0, secoesDesativadas: 0, lancNovos: 0, lancAtualizados: 0, manuaisDescartados: 0, votos: 0 };
+      function chaveSec(z, n) { return (z || '') + '#' + String(int(n)); }
+      function zonaDe(s) { return s.zona || (locById[s.local_id] && locById[s.local_id].zona) || ''; }
+      var tseLocal = {}, tseSec = {};
+      lista.forEach(function (L) {
+        L.zona = String(int(L.zona)); L.nr = String(int(L.nr));
+        (L.secoes || []).forEach(function (x) { tseSec[chaveSec(L.zona, x[0])] = { L: L, numero: String(int(x[0])), aptos: int(x[1]) || 0, agregada_a: x[2] ? String(int(x[2])) : '', votos: x[3] === null || x[3] === undefined || x[3] === '' ? null : int(x[3]) }; });
+        tseLocal[L.zona + '#' + L.nr] = L;
+      });
+      Object.keys(tseSec).forEach(function (k) { var t = tseSec[k]; if (!t.agregada_a) return; var p = tseSec[chaveSec(t.L.zona, t.agregada_a)]; if (p) p.agregadas = (p.agregadas ? p.agregadas + ', ' : '') + t.numero; });
+      var zonasTse = {}; Object.keys(tseLocal).forEach(function (k) { zonasTse[k.split('#')[0]] = true; });
+      var umaZona = Object.keys(zonasTse).length === 1 ? Object.keys(zonasTse)[0] : '';
+      // seção já cadastrada → seção do TSE (sem zona gravada: só casa se o município tiver uma zona só)
+      function tseDaSecao(s) { var z = zonaDe(s) || umaZona; return z ? tseSec[chaveSec(z, s.numero)] : null; }
+
+      if (modo === 'coordenadas') {
+        locais.forEach(function (l) {
+          var cont = {};
+          secoes.forEach(function (s) { if (s.local_id !== l.id) return; var t = tseDaSecao(s); if (t) { var k = t.L.zona + '#' + t.L.nr; cont[k] = (cont[k] || 0) + 1; } });
+          var melhor = Object.keys(cont).sort(function (a, b) { return cont[b] - cont[a]; })[0];
+          if (!melhor) return;
+          var L = tseLocal[melhor], novo = Object.assign({}, l, { zona: L.zona, nr_local: L.nr, lat: L.lat, lng: L.lng, endereco: str(L.endereco).substr(0, 150), bairro: str(L.bairro).substr(0, 80) });
+          if (mudou(rowLocal(l), rowLocal(novo))) { db.update('LOCAIS', l._row, rowLocal(novo)); res.locaisAtualizados++; }
+        });
+        secoes.forEach(function (s) { var t = tseDaSecao(s); if (t && !s.zona) { db.update('SECOES', s._row, rowSec(Object.assign({}, s, { zona: t.L.zona }))); res.secoesAtualizadas++; } });
+        log(db, u.usuario, 'IMPORTAR_TSE_COORD', mun + ': ' + res.locaisAtualizados + ' locais');
+        return res;
+      }
+
+      // 1. locais: casa por zona+nº do local; senão pelo nome; senão cria
+      var porNr = {}, porNome = {};
+      locais.forEach(function (l) { if (l.nr_local) porNr[(l.zona || '') + '#' + l.nr_local] = l; porNome[norm(l.nome)] = porNome[norm(l.nome)] || l; });
+      var idLocal = {}, novosLocais = [], usados = {};
+      Object.keys(tseLocal).forEach(function (k) {
+        var L = tseLocal[k], ex = porNr[k] || (!porNome[norm(L.nome)] || porNome[norm(L.nome)].nr_local ? null : porNome[norm(L.nome)]);
+        var dados = { municipio: mun, nome: str(L.nome).toUpperCase().substr(0, 120), ativo: true, zona: L.zona, nr_local: L.nr, lat: L.lat, lng: L.lng, endereco: str(L.endereco).substr(0, 150), bairro: str(L.bairro).substr(0, 80) };
+        if (ex && !usados[ex.id]) {
+          usados[ex.id] = true; idLocal[k] = ex.id;
+          var novo = Object.assign({}, ex, dados);
+          if (mudou(rowLocal(ex), rowLocal(novo))) { db.update('LOCAIS', ex._row, rowLocal(novo)); res.locaisAtualizados++; }
+        } else {
+          var id = 'L' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
+          idLocal[k] = id; usados[id] = true; novosLocais.push(rowLocal(Object.assign({ id: id }, dados))); res.locaisNovos++;
+        }
+      });
+      gravarEmLote(db, 'LOCAIS', novosLocais);
+      locais.forEach(function (l) { if (!usados[l.id] && l.ativo) { db.update('LOCAIS', l._row, rowLocal(Object.assign({}, l, { ativo: false }))); } });
+
+      // 2. seções
+      var secPorChave = {};
+      secoes.forEach(function (s) { var t = tseDaSecao(s); if (t) { var k = chaveSec(t.L.zona, s.numero); if (!secPorChave[k]) secPorChave[k] = s; } });
+      var idSecao = {}, novasSecoes = [];
+      Object.keys(tseSec).forEach(function (k) {
+        var t = tseSec[k], lid = idLocal[t.L.zona + '#' + t.L.nr], ex = secPorChave[k];
+        var dados = { local_id: lid, numero: t.numero, ativo: true, aptos: t.aptos, agregada_a: t.agregada_a, zona: t.L.zona };
+        if (ex) {
+          idSecao[k] = ex.id;
+          var novo = Object.assign({}, ex, dados);
+          if (mudou(rowSec(ex), rowSec(novo))) { db.update('SECOES', ex._row, rowSec(novo)); res.secoesAtualizadas++; }
+        } else {
+          var id = 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
+          idSecao[k] = id; novasSecoes.push(rowSec(Object.assign({ id: id }, dados))); res.secoesNovas++;
+        }
+      });
+      gravarEmLote(db, 'SECOES', novasSecoes);
+      var mantidas = {}; Object.keys(idSecao).forEach(function (k) { mantidas[idSecao[k]] = true; });
+      secoes.forEach(function (s) { if (!mantidas[s.id] && s.ativo) { db.update('SECOES', s._row, rowSec(Object.assign({}, s, { ativo: false }))); res.secoesDesativadas++; } });
+
+      // 3. lançamentos: um por seção com urna (agregada não tem BU próprio); os da equipe viram "Descartado"
+      var lancs = mapLancamentos(db).filter(function (l) { return norm(l.municipio) === M; });
+      var tsePorId = {}; lancs.forEach(function (l) { if (l.origem === 'TSE') tsePorId[l.id] = l; });
+      var agora = db.stamp(), novosLanc = [];
+      lancs.forEach(function (l) {
+        if (l.origem !== 'TSE' && (l.status === STATUS.VALIDADO || l.status === STATUS.PENDENTE)) {
+          l.status = STATUS.DESCARTADO; l.validado_por = u.usuario; l.validado_em = agora;
+          l.obs = ('Substituído pelo resultado oficial do TSE (boletim de urna)' + (l.obs ? ' · ' + l.obs : '')).substr(0, 200);
+          db.update('LANCAMENTOS', l._row, rowLanc(l)); res.manuaisDescartados++;
+        }
+      });
+      Object.keys(tseSec).forEach(function (k) {
+        var t = tseSec[k];
+        if (t.votos === null || t.agregada_a) return;
+        var L = t.L, id = 'T' + str(req.cd || M.replace(/[^A-Z0-9]/g, '').substr(0, 10)) + 'Z' + L.zona + 'S' + t.numero;
+        var obj = { id: id, client_id: '', recebido_em: str(req.data_tse) || agora, origem: 'TSE', nome: 'Boletim de urna (TSE)', telefone: '', municipio: mun,
+          local_id: idLocal[L.zona + '#' + L.nr], local: str(L.nome).toUpperCase().substr(0, 120), secao_id: idSecao[k], secao: t.numero, votos: t.votos, votos_informados: t.votos,
+          foto_id: '', status: STATUS.VALIDADO, validado_por: 'tse', validado_em: agora, obs: t.agregadas ? 'Inclui a seção agregada ' + t.agregadas : '' };
+        res.votos += t.votos;
+        var ex = tsePorId[id];
+        if (ex) {
+          var novo = Object.assign({}, ex, obj, { validado_em: ex.validado_em, recebido_em: ex.recebido_em });
+          if (mudou(rowLanc(ex), rowLanc(novo))) { db.update('LANCAMENTOS', ex._row, rowLanc(novo)); res.lancAtualizados++; }
+        } else { novosLanc.push(rowLanc(obj)); res.lancNovos++; }
+      });
+      gravarEmLote(db, 'LANCAMENTOS', novosLanc);
+      log(db, u.usuario, 'IMPORTAR_TSE', mun + ': ' + Object.keys(tseSec).length + ' seções, ' + res.votos + ' votos, ' + res.manuaisDescartados + ' envios da equipe substituídos');
+      return res;
+    });
+  };
+
   ACOES['apuracao.importarAptos'] = function (db, req) {
     var u = exigeApuracao(db, req);
     var mun = norm(req.municipio);

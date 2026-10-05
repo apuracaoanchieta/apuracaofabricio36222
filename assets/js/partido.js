@@ -9,6 +9,7 @@
   $('#btn-sair').innerHTML = ICON.sair;
   $('#btn-telao').innerHTML = ICON.tv + 'Abrir modo telão (TV)';
   $('#btn-tse').innerHTML = ICON.grafico + 'Resultado oficial do TSE (estado)';
+  $('#btn-mapa').innerHTML = ICON.mapa + 'Mapa dos votos';
   var tseLiberado = false;
   function ajustarBotaoTse(liberado) {
     tseLiberado = liberado;

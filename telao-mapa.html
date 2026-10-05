@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#019fc6">
+  <meta name="robots" content="noindex">
+  <title>Telão do mapa — Fabricio Petri 36.222</title>
+  <link rel="icon" href="assets/img/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/telao.css">
+</head>
+<body class="pg-telao">
+  <div id="tela-login" class="login-pg" hidden>
+    <header class="hero">
+      <a class="voltar" href="./" aria-label="Voltar ao início"><span data-voltar></span>Início</a>
+      <img class="logo" src="assets/img/logo-480.png" alt="Fabricio Petri — Deputado Estadual 36.222" width="480" height="410">
+      <p class="sub">Telão do mapa dos votos</p>
+    </header>
+    <form class="card login-card" id="form-login">
+      <h1>Digite a senha</h1>
+      <p class="muted small" style="margin:0 0 18px">Senha do Partido ou da Apuração.</p>
+      <div class="campo"><label for="l-senha">Senha de acesso</label>
+        <input class="input" id="l-senha" type="password" autocomplete="current-password" required></div>
+      <div id="l-demo" class="aviso aviso-info small" hidden></div>
+      <button class="btn btn-primario btn-xl" type="submit" id="l-entrar">Abrir telão</button>
+    </form>
+  </div>
+
+  <main id="telao" class="telao telao-mapa" hidden>
+    <header class="t-topo">
+      <img class="t-logo" src="assets/img/logo-480.png" alt="Fabricio Petri 36.222" width="480" height="410">
+      <div class="t-titulo">
+        <div class="t-aovivo"><span class="t-ponto"></span>MAPA DOS VOTOS · DEPUTADO ESTADUAL</div>
+        <div class="t-mun" id="tm-titulo">ESPÍRITO SANTO</div>
+      </div>
+      <div class="t-hora"><b id="t-hora">--:--</b><span id="t-atualizado">atualizando…</span></div>
+    </header>
+
+    <section class="tm-corpo">
+      <div class="tm-mapa-box">
+        <div class="tm-mapa" id="tm-mapa"></div>
+        <div class="tm-legenda" id="tm-legenda"></div>
+      </div>
+      <div class="tm-lado">
+        <div class="tm-total">
+          <div class="t-rot" id="tm-rot-total">VOTOS NO ESTADO</div>
+          <div class="t-numero num" id="tm-votos">0</div>
+          <div class="t-sub" id="tm-sub"></div>
+        </div>
+        <div class="tm-rank">
+          <div class="t-rot" id="tm-rot-rank">MUNICÍPIOS COM MAIS VOTOS</div>
+          <ol id="tm-ranking"></ol>
+        </div>
+      </div>
+    </section>
+
+    <footer class="t-rodape">
+      <span id="tm-rodape"></span>
+      <span class="t-credito">Desenvolvido por <b>DERYCK NOGUEIRA</b></span>
+    </footer>
+
+    <div class="t-controles" id="t-controles">
+      <button type="button" id="t-voltar" class="t-voltar">← Voltar</button>
+      <button type="button" id="tm-metrica">Mostrar: votos</button>
+      <button type="button" id="tm-tour">Passear pelos municípios: não</button>
+      <button type="button" id="t-cheia">Tela cheia</button>
+      <a href="./" id="t-sair">Início</a>
+    </div>
+  </main>
+
+  <script src="assets/js/config.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="assets/js/common.js"></script>
+  <script src="assets/js/mapa-es.js"></script>
+  <script src="assets/js/telao-mapa.js"></script>
+</body>
+</html>
