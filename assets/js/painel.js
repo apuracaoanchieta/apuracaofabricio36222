@@ -44,14 +44,14 @@ var Painel = (function () {
 
     var porLocal = {};
     function linhaLocal(id, nome, mun) {
-      if (!porLocal[id]) porLocal[id] = { id: id, nome: nome, municipio: mun, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, totalInformado: 0, aptos: 0, aptosApur: 0, votosSec: 0, secoes: [] };
+      if (!porLocal[id]) porLocal[id] = { id: id, nome: nome, municipio: mun, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, totalInformado: 0, aptos: 0, aptosApur: 0, votosSec: 0, validosSec: 0, votosComValidos: 0, secoes: [] };
       return porLocal[id];
     }
     var urnaPorSecao = {};
     dados.urnas.forEach(function (u) { urnaPorSecao[u.secao_id] = u; });
 
-    var totalUrnas = 0, aptosTotal = 0, aptosSec = {}, aptosEf = {};
-    dados.secoes.forEach(function (s) { aptosSec[s.id] = Number(s.aptos) || 0; aptosEf[s.id] = aptosSec[s.id]; });
+    var totalUrnas = 0, aptosTotal = 0, aptosSec = {}, aptosEf = {}, validosSec = {};
+    dados.secoes.forEach(function (s) { aptosSec[s.id] = Number(s.aptos) || 0; aptosEf[s.id] = aptosSec[s.id]; if (s.validos !== null && s.validos !== undefined && s.validos !== '') validosSec[s.id] = Number(s.validos); });
     /* Seções AGREGADAS pelo TSE: os votos (e os eleitores) da agregada entram no BU da seção principal.
      * Para as contas de "% dos aptos", os aptos da agregada passam para a principal. */
     var secPorNum = {}, agregadasDe = {};
@@ -69,11 +69,11 @@ var Painel = (function () {
       var u = urnaPorSecao[s.id];
       if (!s.ativo && !u) return;
       var r = linhaLocal(l.id, l.nome, l.municipio);
-      r.secoes.push({ id: s.id, numero: s.numero, ativo: s.ativo, aptos: aptosSec[s.id], urna: u || null, agregada_a: principalDe(s) ? s.agregada_a : '', agregadas: agregadasDe[s.id] || null, aptosEf: aptosEf[s.id], principalId: principalDe(s) ? principalDe(s).id : '' });
+      r.secoes.push({ id: s.id, numero: s.numero, ativo: s.ativo, aptos: aptosSec[s.id], urna: u || null, agregada_a: principalDe(s) ? s.agregada_a : '', agregadas: agregadasDe[s.id] || null, aptosEf: aptosEf[s.id], validos: validosSec[s.id], principalId: principalDe(s) ? principalDe(s).id : '' });
       if (s.ativo) { r.total++; totalUrnas++; r.aptos += aptosSec[s.id]; aptosTotal += aptosSec[s.id]; }
     });
     var st = { votosVal: 0, votosPen: 0, urnasVal: 0, urnasPen: 0, totalUrnas: totalUrnas, votosTotais: 0, totais: 0, eventos: [],
-      aptosTotal: aptosTotal, aptosApur: 0, votosSecComAptos: 0, acimaAptos: [] };
+      aptosTotal: aptosTotal, aptosApur: 0, votosSecComAptos: 0, acimaAptos: [], validosApur: 0, votosComValidos: 0 };
     dados.urnas.forEach(function (u) {
       if (!noFiltro(u.municipio) || !noLocal(u.local_id)) return;
       if (Core.ehTotal(u)) {
@@ -90,6 +90,9 @@ var Painel = (function () {
       if (!r.secoes.some(function (s) { return s.id === u.secao_id; })) r.secoes.push({ id: u.secao_id, numero: u.secao, ativo: true, aptos: aptosSec[u.secao_id] || 0, urna: u });
       var ap = aptosEf[u.secao_id] || 0;
       if (ap) { r.aptosApur += ap; r.votosSec += u.votos; st.aptosApur += ap; st.votosSecComAptos += u.votos; if (u.votos > ap) st.acimaAptos.push(u); }
+      // votos válidos de deputado estadual na seção (boletim de urna do TSE)
+      var vs = (u.validos !== undefined && u.validos !== null && u.validos !== '') ? Number(u.validos) : validosSec[u.secao_id];
+      if (vs > 0) { r.validosSec += vs; r.votosComValidos += u.votos; st.validosApur += vs; st.votosComValidos += u.votos; }
       if (u.status === 'VALIDADO') { r.val++; r.votosVal += u.votos; st.urnasVal++; st.votosVal += u.votos; }
       else { r.pen++; r.votosPen += u.votos; st.urnasPen++; st.votosPen += u.votos; }
       st.eventos.push(u);
@@ -121,6 +124,7 @@ var Painel = (function () {
     st.projecao = st.apuradas >= 5 ? Math.round(st.media * st.totalUrnas) + st.votosTotais : null;
     // com eleitores aptos, a projeção pondera pelo tamanho de cada seção (mais precisa que a média por urna)
     st.pctEleitores = st.aptosApur ? st.votosSecComAptos / st.aptosApur : null;
+    st.pctValidos = st.validosApur ? st.votosComValidos / st.validosApur : null;
     if (st.apuradas >= 5 && st.aptosApur && st.aptosTotal) st.projecao = Math.round(st.pctEleitores * st.aptosTotal) + st.votosTotais;
 
     // outros municípios (fora do filtro atual)
@@ -160,7 +164,7 @@ var Painel = (function () {
       '<section class="card"><div class="card-titulo"><h3>Urnas</h3><span class="muted tiny" id="p-urnas-txt"></span></div><div class="grafico" style="height:260px"><canvas id="g-urnas" aria-label="Gráfico de urnas apuradas" role="img"></canvas></div></section>' +
       '</div>' +
       '<section class="card" style="margin-top:16px"><div class="card-titulo"><h3 id="g-locais-tit">Votos por local de votação</h3><span class="muted tiny">ordenado pelo total</span></div><div class="grafico" id="g-locais-box"><canvas id="g-locais" aria-label="Gráfico de votos por local de votação" role="img"></canvas></div></section>' +
-      '<section class="card"><div class="card-titulo"><h3>Mapa das urnas</h3><span class="muted tiny">número da seção e votos</span></div><div class="mapa" id="p-mapa"></div></section>' +
+      '<section class="card"><div class="card-titulo"><h3>Mapa das urnas</h3><span class="muted tiny" id="p-mapa-sub">número da seção e votos</span></div><div class="mapa" id="p-mapa"></div></section>' +
       '<section class="card"><div class="card-titulo"><h3>Resumo por local</h3></div><div class="tabela-wrap"><table class="tabela responsiva" id="p-tabela"></table></div></section>';
 
     $('#p-mun', raiz).addEventListener('change', function () { municipio = this.value; localSel = ''; if (bruto) atualizar(bruto); });
@@ -258,6 +262,10 @@ var Painel = (function () {
       } else {
         k += '<div class="kpi"><div class="rot">Média por urna</div><div class="val num">' + (st.apuradas ? App.n(Math.round(st.media)) : '—') + '</div><div class="det">' + txtProj + '</div></div>';
       }
+      if (st.pctValidos !== null) {
+        k += '<div class="kpi" title="Votos do candidato divididos pelos votos válidos para deputado estadual (nominais + legenda) nas seções apuradas, segundo os boletins de urna do TSE"><div class="rot">% dos votos válidos</div><div class="val num">' + App.pct(st.votosComValidos, st.validosApur) + '</div><div class="det">' +
+          App.n(st.votosComValidos) + ' de ' + App.n(st.validosApur) + ' votos válidos<br>para deputado estadual</div></div>';
+      }
       $('#p-kpis', raiz).innerHTML = k;
       var acima = $('#p-acima', raiz);
       acima.innerHTML = !partido && st.acimaAptos.length ? '<div class="aviso aviso-perigo">' + ICON.alerta + '<div><b>Votos acima do número de eleitores aptos</b>' +
@@ -269,6 +277,7 @@ var Painel = (function () {
 
       desenharGraficos(st, nomeCand, pctApur);
       desenharMapa(st);
+      var ms = $('#p-mapa-sub', raiz); if (ms) ms.textContent = st.validosApur ? 'número da seção, votos e % dos votos válidos da seção' : 'número da seção e votos';
       var lg = $('.leg-agr', raiz); if (lg) lg.hidden = !st.agregadas;
       desenharTabela(st);
     }
@@ -410,14 +419,15 @@ var Painel = (function () {
             }
             if (s.agregadas) tit += ' · inclui a seção agregada ' + s.agregadas.join(', ');
             if (s.aptos) tit += ' · ' + App.n(s.aptos) + ' eleitores aptos';
-            if (u) tit += ' · ' + App.n(u.votos) + ' votos' + (s.aptos ? ' (' + App.pct(u.votos, s.aptos) + ' dos aptos)' : '') + ' · ' + (u.status === 'VALIDADO' ? 'confirmado' : 'em conferência') + ' · ' + App.hora(u.recebido_em);
+            var vsS = (u && u.validos !== undefined && u.validos !== null && u.validos !== '') ? Number(u.validos) : s.validos;
+            if (u) tit += ' · ' + App.n(u.votos) + ' votos' + (s.aptos ? ' (' + App.pct(u.votos, s.aptos) + ' dos aptos)' : '') + (vsS > 0 ? ' · ' + App.n(vsS) + ' votos válidos na seção (' + App.pct(u.votos, vsS) + ' dos válidos)' : '') + ' · ' + (u.status === 'VALIDADO' ? 'confirmado' : 'em conferência') + ' · ' + App.hora(u.recebido_em);
             else tit += ' · sem envio';
             var apEf = s.aptosEf || s.aptos;
             var acimaAp = u && apEf && u.votos > apEf;
             if (acimaAp) tit += ' · ATENÇÃO: mais votos que eleitores aptos' + (s.agregadas ? ' (somando a agregada)' : '');
             var tag = opcoes.aoClicarSecao && u ? 'button' : 'span';
             return '<' + tag + ' class="chip ' + cls + (dups[s.id] ? ' dup' : '') + (acimaAp ? ' acima' : '') + (s.ativo ? '' : ' inativa') + '" title="' + h(tit) + '"' + (tag === 'button' ? ' data-secao="' + h(s.id) + '"' : '') + '>' + h(s.numero) +
-              (u ? '<small class="num">' + App.n(u.votos) + '</small>' : '<small>—</small>') + '</' + tag + '>';
+              (u ? '<small class="num">' + App.n(u.votos) + '</small>' + (vsS > 0 ? '<small class="num pv">' + App.pct(u.votos, vsS) + '</small>' : '') : '<small>—</small>') + '</' + tag + '>';
           }).join('') + (l.totalInformado ? '<span class="chip chip-total ' + (l.totalStatus || '') + '" title="Total informado sem detalhar seções">TOTAL<small class="num">' + App.n(l.totalInformado) + '</small></span>' : '') + '</div></div>';
       }).join('') : '<div class="vazio">' + (situacao !== 'TODAS' ? 'Nenhuma urna nessa situação.' : 'Nenhuma seção cadastrada para este filtro.') + '</div>';
       if (opcoes.aoClicarSecao) App.$$('[data-secao]', raiz).forEach(function (b) { b.onclick = function () { opcoes.aoClicarSecao(b.dataset.secao); }; });
@@ -427,8 +437,8 @@ var Painel = (function () {
     function porMunicipio(locaisSt) {
       var pm = {};
       locaisSt.forEach(function (l) {
-        var m = pm[l.municipio] || (pm[l.municipio] = { nome: l.municipio, municipio: l.municipio, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, totalInformado: 0, aptos: 0, aptosApur: 0, votosSec: 0, secoes: [] });
-        ['total', 'val', 'pen', 'votosVal', 'votosPen', 'totalInformado', 'aptos', 'aptosApur', 'votosSec'].forEach(function (k) { m[k] += l[k] || 0; });
+        var m = pm[l.municipio] || (pm[l.municipio] = { nome: l.municipio, municipio: l.municipio, total: 0, val: 0, pen: 0, votosVal: 0, votosPen: 0, totalInformado: 0, aptos: 0, aptosApur: 0, votosSec: 0, validosSec: 0, votosComValidos: 0, secoes: [] });
+        ['total', 'val', 'pen', 'votosVal', 'votosPen', 'totalInformado', 'aptos', 'aptosApur', 'votosSec', 'validosSec', 'votosComValidos'].forEach(function (k) { m[k] += l[k] || 0; });
         m.secoes = m.secoes.concat(l.secoes);
         if (l.totalInformado) m.totalStatus = l.totalStatus;
       });
@@ -439,7 +449,7 @@ var Painel = (function () {
       var ls = (todosMun ? porMunicipio(st.locais) : st.locais).slice().sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); })
         .filter(function (l) { return l.secoes.some(passaSituacao) || (l.totalInformado && (situacao === 'TODAS' || situacao === l.totalStatus)); });
       var t = { total: 0, val: 0, pen: 0, vv: 0, vp: 0 };
-      var comAptos = st.aptosTotal > 0;
+      var comAptos = st.aptosTotal > 0, comValidos = st.validosApur > 0;
       var corpo = ls.map(function (l) {
         t.total += l.total; t.val += l.val; t.pen += l.pen; t.vv += l.votosVal; t.vp += l.votosPen;
         var ap = l.val + l.pen;
@@ -450,13 +460,17 @@ var Painel = (function () {
           '<td data-l="Em conferência" class="r" style="color:#b34700">' + (l.votosPen ? App.n(l.votosPen) : '—') + '</td>' +
           '<td data-l="Média/urna" class="r">' + (ap ? App.n(Math.round((l.votosVal + l.votosPen - l.totalInformado) / ap)) : '—') + '</td>' +
           (comAptos ? '<td data-l="Eleitores" class="r">' + (l.aptos ? App.n(l.aptos) : '—') + '</td>' +
-            '<td data-l="% dos aptos" class="r" title="Votos nas seções apuradas ÷ eleitores aptos dessas seções"><b>' + (l.aptosApur ? App.pct(l.votosSec, l.aptosApur) : '—') + '</b></td>' : '') + '</tr>';
+            '<td data-l="% dos aptos" class="r" title="Votos nas seções apuradas ÷ eleitores aptos dessas seções"><b>' + (l.aptosApur ? App.pct(l.votosSec, l.aptosApur) : '—') + '</b></td>' : '') +
+          (comValidos ? '<td data-l="Votos válidos" class="r">' + (l.validosSec ? App.n(l.validosSec) : '—') + '</td>' +
+            '<td data-l="% dos válidos" class="r" title="Votos do candidato ÷ votos válidos de deputado estadual nas seções apuradas"><b>' + (l.validosSec ? App.pct(l.votosComValidos, l.validosSec) : '—') + '</b></td>' : '') + '</tr>';
       }).join('');
       var tt = $('#p-tabela', raiz).closest('.card').querySelector('h3'); if (tt) tt.textContent = todosMun ? 'Resumo por município' : 'Resumo por local';
       $('#p-tabela', raiz).innerHTML = '<thead><tr><th>' + (todosMun ? 'Município' : 'Local') + '</th><th class="r">Urnas</th><th>Progresso</th><th class="r">Confirmados</th><th class="r">Em conferência</th><th class="r">Média/urna</th>' +
-        (comAptos ? '<th class="r">Eleitores</th><th class="r" title="Votos ÷ eleitores aptos das seções apuradas">% dos aptos</th>' : '') + '</tr></thead><tbody>' + corpo + '</tbody>' +
+        (comAptos ? '<th class="r">Eleitores</th><th class="r" title="Votos ÷ eleitores aptos das seções apuradas">% dos aptos</th>' : '') +
+        (comValidos ? '<th class="r">Votos válidos</th><th class="r" title="Votos ÷ votos válidos de deputado estadual">% dos válidos</th>' : '') + '</tr></thead><tbody>' + corpo + '</tbody>' +
         '<tfoot><tr><td data-l="Total">Total</td><td data-l="Urnas" class="r">' + (t.val + t.pen) + '/' + t.total + '</td><td class="oculto-mobile"></td><td data-l="Confirmados" class="r">' + App.n(t.vv) + '</td><td data-l="Em conferência" class="r">' + App.n(t.vp) + '</td><td data-l="Média/urna" class="r">' + ((t.val + t.pen) ? App.n(Math.round(st.media)) : '—') + '</td>' +
-        (comAptos ? '<td data-l="Eleitores" class="r">' + App.n(st.aptosTotal) + '</td><td data-l="% dos aptos" class="r">' + (st.aptosApur ? App.pct(st.votosSecComAptos, st.aptosApur) : '—') + '</td>' : '') + '</tr></tfoot>';
+        (comAptos ? '<td data-l="Eleitores" class="r">' + App.n(st.aptosTotal) + '</td><td data-l="% dos aptos" class="r">' + (st.aptosApur ? App.pct(st.votosSecComAptos, st.aptosApur) : '—') + '</td>' : '') +
+        (comValidos ? '<td data-l="Votos válidos" class="r">' + App.n(st.validosApur) + '</td><td data-l="% dos válidos" class="r">' + App.pct(st.votosComValidos, st.validosApur) + '</td>' : '') + '</tr></tfoot>';
     }
 
     return { atualizar: atualizar };

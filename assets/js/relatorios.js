@@ -30,7 +30,7 @@ var Relat = (function () {
       st.locais.sort(function (a, b) { return (b.votosVal + b.votosPen) - (a.votosVal + a.votosPen) || a.nome.localeCompare(b.nome, 'pt-BR'); });
       return st;
     }).filter(function (st) { return st.totalUrnas || st.votosVal || st.votosPen; });
-    var tot = { votosVal: 0, votosPen: 0, apuradas: 0, totalUrnas: 0, urnasVal: 0, urnasPen: 0, aptosTotal: 0, aptosApur: 0, votosSecComAptos: 0 };
+    var tot = { votosVal: 0, votosPen: 0, apuradas: 0, totalUrnas: 0, urnasVal: 0, urnasPen: 0, aptosTotal: 0, aptosApur: 0, votosSecComAptos: 0, validosApur: 0, votosComValidos: 0 };
     lista.forEach(function (st) { Object.keys(tot).forEach(function (k) { tot[k] += st[k] || 0; }); });
     return { config: d.config, municipios: lista, total: tot, agora: d.agora, urnasPorSecao: v._urnasPorSecao };
   }
@@ -63,44 +63,44 @@ var Relat = (function () {
       ];
 
       // 1. Resumo por município
-      var res = cab.concat([['Município', 'Urnas apuradas', 'Total de urnas', '% apurado', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Inclui totais informados', 'Eleitores aptos', '% do eleitorado apurado', '% dos aptos (seções apuradas)']]);
+      var res = cab.concat([['Município', 'Urnas apuradas', 'Total de urnas', '% apurado', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Inclui totais informados', 'Eleitores aptos', '% do eleitorado apurado', '% dos aptos (seções apuradas)', 'Votos válidos (dep. estadual)', '% dos votos válidos']]);
       r.municipios.forEach(function (st) {
         res.push([st.municipio, st.apuradas, st.totalUrnas, p1(st.apuradas, st.totalUrnas), st.votosVal, st.votosPen, st.votosVal + st.votosPen, st.votosTotais || '',
-          st.aptosTotal || '', p1(st.aptosApur, st.aptosTotal), p1(st.votosSecComAptos, st.aptosApur)]);
+          st.aptosTotal || '', p1(st.aptosApur, st.aptosTotal), p1(st.votosSecComAptos, st.aptosApur), st.validosApur || '', p1(st.votosComValidos, st.validosApur)]);
       });
       res.push(['TOTAL', r.total.apuradas, r.total.totalUrnas, p1(r.total.apuradas, r.total.totalUrnas), r.total.votosVal, r.total.votosPen, r.total.votosVal + r.total.votosPen, '',
-        r.total.aptosTotal || '', p1(r.total.aptosApur, r.total.aptosTotal), p1(r.total.votosSecComAptos, r.total.aptosApur)]);
-      XLSX.utils.book_append_sheet(wb, folha(res, [26, 15, 15, 11, 18, 20, 15, 22, 15, 22, 26]), 'Resumo');
+        r.total.aptosTotal || '', p1(r.total.aptosApur, r.total.aptosTotal), p1(r.total.votosSecComAptos, r.total.aptosApur), r.total.validosApur || '', p1(r.total.votosComValidos, r.total.validosApur)]);
+      XLSX.utils.book_append_sheet(wb, folha(res, [26, 15, 15, 11, 18, 20, 15, 22, 15, 22, 26, 24, 18]), 'Resumo');
 
       // 2. Por local
-      var pl = cab.concat([['Município', 'Local de votação', 'Urnas apuradas', 'Total de urnas', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Total informado (sem seção)', 'Média por urna', 'Eleitores aptos', '% dos aptos (seções apuradas)']]);
+      var pl = cab.concat([['Município', 'Local de votação', 'Urnas apuradas', 'Total de urnas', 'Votos confirmados', 'Votos em conferência', 'Total de votos', 'Total informado (sem seção)', 'Média por urna', 'Eleitores aptos', '% dos aptos (seções apuradas)', 'Votos válidos (dep. estadual)', '% dos votos válidos']]);
       r.municipios.forEach(function (st) {
         st.locais.forEach(function (l) {
           var ap = l.val + l.pen;
           pl.push([st.municipio, l.nome, ap, l.total, l.votosVal, l.votosPen, l.votosVal + l.votosPen, l.totalInformado || '', ap ? Math.round((l.votosVal + l.votosPen - (l.totalInformado || 0)) / ap) : '',
-            l.aptos || '', p1(l.votosSec, l.aptosApur)]);
+            l.aptos || '', p1(l.votosSec, l.aptosApur), l.validosSec || '', p1(l.votosComValidos, l.validosSec)]);
         });
       });
-      XLSX.utils.book_append_sheet(wb, folha(pl, [18, 36, 14, 14, 18, 20, 14, 24, 14, 14, 26]), 'Por local');
+      XLSX.utils.book_append_sheet(wb, folha(pl, [18, 36, 14, 14, 18, 20, 14, 24, 14, 14, 26, 24, 18]), 'Por local');
 
       // 3. Por seção (inclui seções sem envio)
-      var ps = cab.concat([['Município', 'Local de votação', 'Seção', 'Situação', 'Votos', 'Eleitores aptos', '% dos aptos', 'Fiscal / quem informou', 'Telefone', 'Recebido em', 'Conferido por', 'Conferido em', 'Foto do BU']]);
+      var ps = cab.concat([['Município', 'Local de votação', 'Seção', 'Situação', 'Votos', 'Eleitores aptos', '% dos aptos', 'Votos válidos (dep. estadual)', '% dos votos válidos', 'Fiscal / quem informou', 'Telefone', 'Recebido em', 'Conferido por', 'Conferido em', 'Foto do BU']]);
       r.municipios.forEach(function (st) {
         st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).forEach(function (l) {
           l.secoes.forEach(function (s) {
             var u = s.urna;
             if (s.agregada_a && !u) {
-              ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, 'Agregada à seção ' + s.agregada_a, '', s.aptos || '', '', 'Votos somados no BU da seção ' + s.agregada_a, '', '', '', '', '']);
+              ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, 'Agregada à seção ' + s.agregada_a, '', s.aptos || '', '', '', '', 'Votos somados no BU da seção ' + s.agregada_a, '', '', '', '', '']);
               return;
             }
             var apEf = s.aptosEf || s.aptos;
-            ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, (u ? ROT[u.status] : (s.ativo ? 'Sem envio' : 'Seção inativa')) + (s.agregada_a ? ' · agregada à ' + s.agregada_a : '') + (s.agregadas ? ' · inclui agregada ' + s.agregadas.join(', ') : ''), u ? u.votos : '', s.aptos || '', u && apEf ? p1(u.votos, apEf) : '',
+            ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, (u ? ROT[u.status] : (s.ativo ? 'Sem envio' : 'Seção inativa')) + (s.agregada_a ? ' · agregada à ' + s.agregada_a : '') + (s.agregadas ? ' · inclui agregada ' + s.agregadas.join(', ') : ''), u ? u.votos : '', s.aptos || '', u && apEf ? p1(u.votos, apEf) : '', s.validos > 0 ? s.validos : '', u && s.validos > 0 ? p1(u.votos, s.validos) : '',
               u ? u.nome : '', u ? App.tel(u.telefone) : '', u ? dataBr(u.recebido_em) : '', u ? u.validado_por : '', u ? dataBr(u.validado_em) : '', u ? linkFoto(u.foto_id) : '']);
           });
-          if (l.totalInformado) ps.push([st.municipio, l.nome, 'TOTAL', 'Total informado (' + (ROT[l.totalStatus] || '').toLowerCase() + ')', l.totalInformado, '', '', '', '', '', '', '', '']);
+          if (l.totalInformado) ps.push([st.municipio, l.nome, 'TOTAL', 'Total informado (' + (ROT[l.totalStatus] || '').toLowerCase() + ')', l.totalInformado, '', '', '', '', '', '', '', '', '', '']);
         });
       });
-      XLSX.utils.book_append_sheet(wb, folha(ps, [18, 36, 8, 18, 9, 14, 11, 26, 17, 20, 14, 20, 48]), 'Por seção');
+      XLSX.utils.book_append_sheet(wb, folha(ps, [18, 36, 8, 18, 9, 14, 11, 22, 16, 26, 17, 20, 14, 20, 48]), 'Por seção');
 
       // 4. Todos os envios (histórico completo)
       var te = cab.concat([['ID', 'Recebido em', 'Origem', 'Fiscal / quem informou', 'Telefone', 'Município', 'Local de votação', 'Seção', 'Votos', 'Votos informados pelo fiscal', 'Status', 'Conferido por', 'Conferido em', 'Observação', 'Foto do BU']]);

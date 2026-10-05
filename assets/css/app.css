@@ -360,6 +360,7 @@ textarea.input { min-height: 110px; resize: vertical; }
   background: var(--trilho); color: var(--texto-2); border: 1px solid transparent; cursor: default; font-variant-numeric: tabular-nums;
 }
 .chip small { display: block; font-size: 10.5px; font-weight: 700; opacity: .9; margin-top: 1px; }
+.chip small.pv { font-size: 9.5px; font-weight: 600; opacity: .8; margin-top: 0; }
 .chip.VALIDADO { background: var(--validado); color: #fff; }
 .chip.PENDENTE { background: repeating-linear-gradient(135deg, var(--pendente) 0 5px, #f47a1d 5px 9px); color: #fff; }
 .chip.dup { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--perigo); }
