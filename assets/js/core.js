@@ -16,7 +16,7 @@ var Core = (function () {
   var SCHEMA = {
     CONFIG: ['chave', 'valor', 'descricao'],
     LOCAIS: ['id', 'municipio', 'nome', 'ativo'],
-    SECOES: ['id', 'local_id', 'numero', 'ativo', 'aptos'],
+    SECOES: ['id', 'local_id', 'numero', 'ativo', 'aptos', 'agregada_a'],
     LANCAMENTOS: ['id', 'client_id', 'recebido_em', 'origem', 'nome', 'telefone', 'municipio',
       'local_id', 'local', 'secao_id', 'secao', 'votos', 'votos_informados', 'foto_id',
       'status', 'validado_por', 'validado_em', 'obs'],
@@ -232,10 +232,23 @@ var Core = (function () {
   function mapSecoes(db) {
     return db.read('SECOES').map(function (r) {
       var ap = int(r.aptos);
-      return { id: str(r.id), local_id: str(r.local_id), numero: str(r.numero), ativo: bool(r.ativo), aptos: isNaN(ap) || ap < 0 ? 0 : ap, _row: r._row };
+      var ag = int(r.agregada_a);
+      return { id: str(r.id), local_id: str(r.local_id), numero: str(r.numero), ativo: bool(r.ativo), aptos: isNaN(ap) || ap < 0 ? 0 : ap, agregada_a: isNaN(ag) || ag <= 0 ? '' : String(ag), _row: r._row };
     });
   }
-  function rowSec(s) { return { id: s.id, local_id: s.local_id, numero: s.numero, ativo: s.ativo ? 'TRUE' : 'FALSE', aptos: s.aptos ? String(s.aptos) : '' }; }
+  function rowSec(s) { return { id: s.id, local_id: s.local_id, numero: s.numero, ativo: s.ativo ? 'TRUE' : 'FALSE', aptos: s.aptos ? String(s.aptos) : '', agregada_a: s.agregada_a ? String(s.agregada_a) : '' }; }
+  /* Seções AGREGADAS pelo TSE em Anchieta (eleição 2026): seção agregada → seção principal.
+   * Os votos da agregada vêm somados no boletim de urna (BU) da principal. */
+  var AGREGADAS_SEED = { 72: 22, 75: 16, 76: 24, 78: 15, 144: 17, 171: 68, 173: 40 };
+  function completarAgregadas(db) {
+    var anch = {};
+    mapLocais(db).forEach(function (l) { if (norm(l.municipio) === 'ANCHIETA') anch[l.id] = true; });
+    var n = 0;
+    mapSecoes(db).forEach(function (s) {
+      if (anch[s.local_id] && !s.agregada_a && AGREGADAS_SEED[s.numero]) { s.agregada_a = String(AGREGADAS_SEED[s.numero]); db.update('SECOES', s._row, rowSec(s)); n++; }
+    });
+    return n;
+  }
   /* Preenche os eleitores aptos das seções de Anchieta que ainda estão sem esse dado */
   function completarAptos(db) {
     var anch = {};
@@ -606,15 +619,27 @@ var Core = (function () {
         aptos = str(req.aptos) === '' ? 0 : int(req.aptos);
         if (isNaN(aptos) || aptos < 0 || aptos > 99999) throw erro('Quantidade de eleitores aptos inválida.');
       }
+      var agregada = null;
+      if (req.agregada_a !== undefined && req.agregada_a !== null) {
+        agregada = str(req.agregada_a) === '' ? '' : int(req.agregada_a);
+        if (agregada !== '') {
+          if (isNaN(agregada) || agregada <= 0) throw erro('Número da seção principal inválido.');
+          if (agregada === num) throw erro('A seção não pode ser agregada a ela mesma.');
+          var princ = find(secoes, function (s) { return locaisMun[s.local_id] && s.numero === String(agregada); });
+          if (!princ) throw erro('A seção ' + agregada + ' não está cadastrada em ' + local.municipio + '.');
+          if (princ.agregada_a) throw erro('A seção ' + agregada + ' também está marcada como agregada. Escolha a seção principal.');
+          agregada = String(agregada);
+        }
+      }
       if (req.id) {
         var s = find(secoes, function (x) { return x.id === str(req.id); });
         if (!s) throw erro('Seção não encontrada.');
-        db.update('SECOES', s._row, rowSec({ id: s.id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos === null ? s.aptos : aptos }));
+        db.update('SECOES', s._row, rowSec({ id: s.id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos === null ? s.aptos : aptos, agregada_a: agregada === null ? s.agregada_a : agregada }));
         log(db, u.usuario, 'EDITAR_SECAO', s.id + ' nº ' + num);
         return { id: s.id };
       }
       var id = 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase();
-      db.append('SECOES', rowSec({ id: id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos || 0 }));
+      db.append('SECOES', rowSec({ id: id, local_id: local.id, numero: String(num), ativo: req.ativo !== false, aptos: aptos || 0, agregada_a: agregada || '' }));
       log(db, u.usuario, 'CRIAR_SECAO', id + ' nº ' + num + ' em ' + local.nome);
       return { id: id };
     });
@@ -714,10 +739,10 @@ var Core = (function () {
           var s = secPorNum[n];
           localNovoDaSecao[n] = nv;
           if (!s) db.append('SECOES', rowSec({ id: 'S' + db.uuid().replace(/-/g, '').substr(0, 8).toUpperCase(), local_id: nv.id, numero: n, ativo: true, aptos: 0 }));
-          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: nv.id, numero: s.numero, ativo: true, aptos: s.aptos }));
+          else if (s.local_id !== nv.id || !s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: nv.id, numero: s.numero, ativo: true, aptos: s.aptos, agregada_a: s.agregada_a }));
         });
       });
-      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: s.local_id, numero: s.numero, ativo: false, aptos: s.aptos })); });
+      secoes.forEach(function (s) { if (!naLista[s.numero] && s.ativo) db.update('SECOES', s._row, rowSec({ id: s.id, local_id: s.local_id, numero: s.numero, ativo: false, aptos: s.aptos, agregada_a: s.agregada_a })); });
       locais.forEach(function (l) { if (!usados[l.id] && l.ativo) db.update('LOCAIS', l._row, { id: l.id, municipio: l.municipio, nome: l.nome, ativo: 'FALSE' }); });
       // mantém os envios já registrados apontando para o local/nome certos
       var nomePorId = {}; novos.forEach(function (nv) { nomePorId[nv.id] = nv.nome; });
@@ -1223,7 +1248,7 @@ var Core = (function () {
       SEED.forEach(function (item, i) {
         var lid = 'L' + (i + 1 < 10 ? '0' : '') + (i + 1);
         db.append('LOCAIS', { id: lid, municipio: 'ANCHIETA', nome: item[0], ativo: 'TRUE' });
-        item[1].forEach(function (n) { db.append('SECOES', rowSec({ id: 'S' + n, local_id: lid, numero: String(n), ativo: true, aptos: APTOS_SEED[n] || 0 })); });
+        item[1].forEach(function (n) { db.append('SECOES', rowSec({ id: 'S' + n, local_id: lid, numero: String(n), ativo: true, aptos: APTOS_SEED[n] || 0, agregada_a: AGREGADAS_SEED[n] ? String(AGREGADAS_SEED[n]) : '' })); });
       });
     }
     completarAptos(db);
@@ -1255,7 +1280,7 @@ var Core = (function () {
 
   return {
     SCHEMA: SCHEMA, STATUS: STATUS, PERFIS: PERFIS, SEED: SEED, CONFIG_PADRAO: CONFIG_PADRAO,
-    handle: handle, instalar: instalar, executarTseAutomatico: executarTseAutomatico, resolverUrnas: resolverUrnas, completarAptos: completarAptos, normalizarResultadoTse: normalizarResultadoTse,
+    handle: handle, instalar: instalar, executarTseAutomatico: executarTseAutomatico, resolverUrnas: resolverUrnas, completarAptos: completarAptos, completarAgregadas: completarAgregadas, normalizarResultadoTse: normalizarResultadoTse,
     sha256: sha256, hmac: hmac, norm: norm, int: int,
     ehTotal: function (l) { return /^TOT-/.test(String(l && l.secao_id || '')); }
   };

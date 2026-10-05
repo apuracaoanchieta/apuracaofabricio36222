@@ -123,12 +123,13 @@
       lista.forEach(function (st) {
         var locs = st.locais.filter(function (l) { return l.secoes.length; }).slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
         if (!locs.length) return;
-        html += '<h2 class="quebra">' + h(st.municipio) + ' — votos por seção</h2><p class="rel-leg"><span class="mk VALIDADO">✓</span> confirmado &nbsp; <span class="mk PENDENTE">!</span> em conferência &nbsp; <span class="mk SEM">–</span> sem envio</p><div class="rel-secoes">';
+        html += '<h2 class="quebra">' + h(st.municipio) + ' — votos por seção</h2><p class="rel-leg"><span class="mk VALIDADO">✓</span> confirmado &nbsp; <span class="mk PENDENTE">!</span> em conferência &nbsp; <span class="mk SEM">–</span> sem envio' + (st.agregadas ? ' &nbsp; <span class="mk AGR">↗</span> seção agregada (votos somados na seção principal)' : '') + '</p><div class="rel-secoes">';
         locs.forEach(function (l) {
           html += '<div class="rel-local"><h3>' + h(l.nome) + '<span>' + n(l.votosVal + l.votosPen) + ' votos</span></h3><table><tbody>' +
             l.secoes.map(function (s) {
               var u = s.urna, stt = u ? u.status : 'SEM';
-              return '<tr><td>Seção ' + h(s.numero) + (s.ativo ? '' : ' <small>(inativa)</small>') + (s.aptos ? ' <small>' + n(s.aptos) + ' aptos</small>' : '') + '</td><td class="r">' + (u ? n(u.votos) : '—') + '</td><td class="c"><span class="mk ' + stt + '">' + (stt === 'VALIDADO' ? '✓' : stt === 'PENDENTE' ? '!' : '–') + '</span></td></tr>';
+              if (s.agregada_a) return '<tr class="agr"><td>Seção ' + h(s.numero) + ' <small>agregada à ' + h(s.agregada_a) + '</small>' + (s.aptos ? ' <small>' + n(s.aptos) + ' aptos</small>' : '') + '</td><td class="r"><small>na ' + h(s.agregada_a) + '</small></td><td class="c"><span class="mk AGR">↗</span></td></tr>';
+              return '<tr><td>Seção ' + h(s.numero) + (s.ativo ? '' : ' <small>(inativa)</small>') + (s.aptos ? ' <small>' + n(s.aptos) + ' aptos</small>' : '') + (s.agregadas ? ' <small>+ agregada ' + s.agregadas.join(', ') + '</small>' : '') + '</td><td class="r">' + (u ? n(u.votos) : '—') + '</td><td class="c"><span class="mk ' + stt + '">' + (stt === 'VALIDADO' ? '✓' : stt === 'PENDENTE' ? '!' : '–') + '</span></td></tr>';
             }).join('') + (l.totalInformado ? '<tr><td>Total informado</td><td class="r">' + n(l.totalInformado) + '</td><td class="c"><span class="mk ' + (l.totalStatus || 'VALIDADO') + '">✓</span></td></tr>' : '') +
             '</tbody></table></div>';
         });
@@ -138,6 +139,7 @@
 
     html += '<footer class="rel-rodape"><p>"Confirmado" = conferido pela equipe de apuração com a foto do boletim de urna. "Em conferência" = enviado pelo fiscal e ainda não conferido. ' +
       '"% dos aptos" = votos do candidato ÷ eleitores aptos das seções já apuradas. ' +
+      "Seção agregada" = seção que o TSE juntou a outra na mesma urna; seus votos estão somados no boletim de urna da seção principal. ' +
       'Totais informados são resultados recebidos sem o detalhe por seção. Este é um levantamento interno da campanha; o resultado oficial é o divulgado pelo TSE/TRE-ES.</p>' +
       '<div class="rel-assin"><div>Responsável pela apuração</div><div>Data e hora</div></div>' +
       '<p class="rel-credito">Sistema de apuração desenvolvido por <b>DERYCK NOGUEIRA</b></p></footer>';

@@ -50,15 +50,25 @@ var Painel = (function () {
     var urnaPorSecao = {};
     dados.urnas.forEach(function (u) { urnaPorSecao[u.secao_id] = u; });
 
-    var totalUrnas = 0, aptosTotal = 0, aptosSec = {};
-    dados.secoes.forEach(function (s) { aptosSec[s.id] = Number(s.aptos) || 0; });
+    var totalUrnas = 0, aptosTotal = 0, aptosSec = {}, aptosEf = {};
+    dados.secoes.forEach(function (s) { aptosSec[s.id] = Number(s.aptos) || 0; aptosEf[s.id] = aptosSec[s.id]; });
+    /* Seções AGREGADAS pelo TSE: os votos (e os eleitores) da agregada entram no BU da seção principal.
+     * Para as contas de "% dos aptos", os aptos da agregada passam para a principal. */
+    var secPorNum = {}, agregadasDe = {};
+    dados.secoes.forEach(function (s) { var l = locais[s.local_id]; if (l) secPorNum[Core.norm(l.municipio) + '#' + s.numero] = s; });
+    function principalDe(s) { var l = locais[s.local_id]; return s.agregada_a && l ? secPorNum[Core.norm(l.municipio) + '#' + s.agregada_a] || null : null; }
+    dados.secoes.forEach(function (s) {
+      var p = principalDe(s); if (!p || !s.ativo) return;
+      aptosEf[p.id] = (aptosEf[p.id] || 0) + aptosSec[s.id]; aptosEf[s.id] = 0;
+      (agregadasDe[p.id] = agregadasDe[p.id] || []).push(s.numero);
+    });
     dados.secoes.forEach(function (s) {
       var l = locais[s.local_id];
       if (!l || !noFiltro(l.municipio) || !noLocal(l.id)) return;
       var u = urnaPorSecao[s.id];
       if (!s.ativo && !u) return;
       var r = linhaLocal(l.id, l.nome, l.municipio);
-      r.secoes.push({ id: s.id, numero: s.numero, ativo: s.ativo, aptos: aptosSec[s.id], urna: u || null });
+      r.secoes.push({ id: s.id, numero: s.numero, ativo: s.ativo, aptos: aptosSec[s.id], urna: u || null, agregada_a: principalDe(s) ? s.agregada_a : '', agregadas: agregadasDe[s.id] || null, aptosEf: aptosEf[s.id], principalId: principalDe(s) ? principalDe(s).id : '' });
       if (s.ativo) { r.total++; totalUrnas++; r.aptos += aptosSec[s.id]; aptosTotal += aptosSec[s.id]; }
     });
     var st = { votosVal: 0, votosPen: 0, urnasVal: 0, urnasPen: 0, totalUrnas: totalUrnas, votosTotais: 0, totais: 0, eventos: [],
@@ -77,11 +87,25 @@ var Painel = (function () {
       }
       var r = porLocal[u.local_id] || linhaLocal(u.local_id, u.local, u.municipio);
       if (!r.secoes.some(function (s) { return s.id === u.secao_id; })) r.secoes.push({ id: u.secao_id, numero: u.secao, ativo: true, aptos: aptosSec[u.secao_id] || 0, urna: u });
-      var ap = aptosSec[u.secao_id] || 0;
+      var ap = aptosEf[u.secao_id] || 0;
       if (ap) { r.aptosApur += ap; r.votosSec += u.votos; st.aptosApur += ap; st.votosSecComAptos += u.votos; if (u.votos > ap) st.acimaAptos.push(u); }
       if (u.status === 'VALIDADO') { r.val++; r.votosVal += u.votos; st.urnasVal++; st.votosVal += u.votos; }
       else { r.pen++; r.votosPen += u.votos; st.urnasPen++; st.votosPen += u.votos; }
       st.eventos.push(u);
+    });
+    // agregada sem envio próprio: conta como apurada junto com a principal (os votos já estão no BU da principal)
+    st.agregadas = 0;
+    Object.keys(porLocal).forEach(function (k) {
+      var r = porLocal[k];
+      r.secoes.forEach(function (s) {
+        if (!s.agregada_a || !s.ativo) return;
+        st.agregadas++;
+        if (s.urna) return;
+        var up = urnaPorSecao[s.principalId];
+        if (!up) return;
+        s.urnaPrincipal = up;
+        if (up.status === 'VALIDADO') { r.val++; st.urnasVal++; } else { r.pen++; st.urnasPen++; }
+      });
     });
     // seções lançadas fora do cadastro contam no total
     Object.keys(porLocal).forEach(function (k) {
@@ -124,7 +148,7 @@ var Painel = (function () {
       '<div class="filtro"><label for="p-sit">Mostrar urnas</label><select class="input" id="p-sit">' +
       '<option value="TODAS">Todas</option><option value="VALIDADO">Só confirmadas</option><option value="PENDENTE">Só em conferência</option><option value="SEM">Só sem envio</option></select></div>' +
       '<button class="btn btn-ghost btn-sm filtro-limpar" id="p-limpar" type="button" hidden>Limpar filtros</button>' +
-      '<div class="legenda filtro-legenda"><span><i class="l-val"></i>Confirmados</span><span><i class="l-pen"></i>Em conferência</span><span><i class="l-sem"></i>Sem envio</span></div></div>' +
+      '<div class="legenda filtro-legenda"><span><i class="l-val"></i>Confirmados</span><span><i class="l-pen"></i>Em conferência</span><span><i class="l-sem"></i>Sem envio</span><span class="leg-agr" hidden><i class="l-agr"></i>Agregada (votos somados na seção principal)</span></div></div>' +
       '<div id="p-outros"></div>' +
       '<div class="kpis" id="p-kpis"></div><div id="p-acima"></div>' +
       (partido ? '<div class="explica">' +
@@ -161,8 +185,9 @@ var Painel = (function () {
     }
     function passaSituacao(s) {
       if (situacao === 'TODAS') return true;
-      if (situacao === 'SEM') return !s.urna && s.ativo;
-      return s.urna && s.urna.status === situacao;
+      var u = s.urna || s.urnaPrincipal;
+      if (situacao === 'SEM') return !u && s.ativo;
+      return u && u.status === situacao;
     }
 
     function opcoesMunicipio(dados) {
@@ -237,6 +262,7 @@ var Painel = (function () {
 
       desenharGraficos(st, nomeCand, pctApur);
       desenharMapa(st);
+      var lg = $('.leg-agr', raiz); if (lg) lg.hidden = !st.agregadas;
       desenharTabela(st);
     }
 
@@ -355,11 +381,21 @@ var Painel = (function () {
         return '<div class="mapa-local"><div class="cab"><b>' + h(l.nome) + '</b><span>' + (l.total ? (l.val + l.pen) + '/' + l.total : 'total') + '</span></div><div class="chips">' +
           l.secoes.filter(passaSituacao).map(function (s) {
             var u = s.urna, cls = u ? u.status : '', tit = 'Seção ' + s.numero;
+            if (s.agregada_a) {
+              var up = u || s.urnaPrincipal;
+              tit = 'Seção ' + s.numero + ' AGREGADA à seção ' + s.agregada_a + ' pelo TSE: os votos e os eleitores desta seção estão somados no boletim de urna da seção ' + s.agregada_a + '.' +
+                (s.aptos ? ' · ' + App.n(s.aptos) + ' eleitores aptos' : '') + (up ? ' · seção ' + s.agregada_a + (up.status === 'VALIDADO' ? ' confirmada' : ' em conferência') : ' · seção ' + s.agregada_a + ' sem envio');
+              var tagA = opcoes.aoClicarSecao && u ? 'button' : 'span';
+              return '<' + tagA + ' class="chip agregada ' + (up ? up.status : '') + '" title="' + h(tit) + '"' + (tagA === 'button' ? ' data-secao="' + h(s.id) + '"' : '') + '>' + h(s.numero) +
+                '<small>→ ' + h(s.agregada_a) + '</small></' + tagA + '>';
+            }
+            if (s.agregadas) tit += ' · inclui a seção agregada ' + s.agregadas.join(', ');
             if (s.aptos) tit += ' · ' + App.n(s.aptos) + ' eleitores aptos';
             if (u) tit += ' · ' + App.n(u.votos) + ' votos' + (s.aptos ? ' (' + App.pct(u.votos, s.aptos) + ' dos aptos)' : '') + ' · ' + (u.status === 'VALIDADO' ? 'confirmado' : 'em conferência') + ' · ' + App.hora(u.recebido_em);
             else tit += ' · sem envio';
-            var acimaAp = u && s.aptos && u.votos > s.aptos;
-            if (acimaAp) tit += ' · ATENÇÃO: mais votos que eleitores aptos';
+            var apEf = s.aptosEf || s.aptos;
+            var acimaAp = u && apEf && u.votos > apEf;
+            if (acimaAp) tit += ' · ATENÇÃO: mais votos que eleitores aptos' + (s.agregadas ? ' (somando a agregada)' : '');
             var tag = opcoes.aoClicarSecao && u ? 'button' : 'span';
             return '<' + tag + ' class="chip ' + cls + (dups[s.id] ? ' dup' : '') + (acimaAp ? ' acima' : '') + (s.ativo ? '' : ' inativa') + '" title="' + h(tit) + '"' + (tag === 'button' ? ' data-secao="' + h(s.id) + '"' : '') + '>' + h(s.numero) +
               (u ? '<small class="num">' + App.n(u.votos) + '</small>' : '<small>—</small>') + '</' + tag + '>';

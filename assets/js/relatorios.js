@@ -84,7 +84,12 @@ var Relat = (function () {
         st.locais.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); }).forEach(function (l) {
           l.secoes.forEach(function (s) {
             var u = s.urna;
-            ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, u ? ROT[u.status] : (s.ativo ? 'Sem envio' : 'Seção inativa'), u ? u.votos : '', s.aptos || '', u && s.aptos ? p1(u.votos, s.aptos) : '',
+            if (s.agregada_a && !u) {
+              ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, 'Agregada à seção ' + s.agregada_a, '', s.aptos || '', '', 'Votos somados no BU da seção ' + s.agregada_a, '', '', '', '', '']);
+              return;
+            }
+            var apEf = s.aptosEf || s.aptos;
+            ps.push([st.municipio, l.nome, Number(s.numero) || s.numero, (u ? ROT[u.status] : (s.ativo ? 'Sem envio' : 'Seção inativa')) + (s.agregada_a ? ' · agregada à ' + s.agregada_a : '') + (s.agregadas ? ' · inclui agregada ' + s.agregadas.join(', ') : ''), u ? u.votos : '', s.aptos || '', u && apEf ? p1(u.votos, apEf) : '',
               u ? u.nome : '', u ? App.tel(u.telefone) : '', u ? dataBr(u.recebido_em) : '', u ? u.validado_por : '', u ? dataBr(u.validado_em) : '', u ? linkFoto(u.foto_id) : '']);
           });
           if (l.totalInformado) ps.push([st.municipio, l.nome, 'TOTAL', 'Total informado (' + (ROT[l.totalStatus] || '').toLowerCase() + ')', l.totalInformado, '', '', '', '', '', '', '', '']);

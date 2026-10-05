@@ -54,6 +54,8 @@
 .mk.VALIDADO { background: var(--azul-esc); }
 .mk.PENDENTE { background: var(--laranja-esc); }
 .mk.SEM { background: #c9d6de; color: #4b6576; }
+.mk.AGR { background: #fff; color: var(--azul-esc); border: 1.5px dashed var(--azul-esc); box-sizing: border-box; line-height: 11px; }
+.rel-local tr.agr td { color: #5d7686; font-style: italic; }
 
 .rel-rodape { margin-top: 18px; padding-top: 10px; border-top: 1px solid #cfdde5; font-size: 8pt; color: #4b6576; break-inside: avoid; }
 .rel-credito { text-align: center; margin: 22px 0 0; font-size: 8pt; color: #4b6576; }

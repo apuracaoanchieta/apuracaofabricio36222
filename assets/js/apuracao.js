@@ -680,8 +680,8 @@
           '<button class="btn btn-ghost btn-sm" data-edlocal="' + l.id + '">' + ICON.lapis + 'Editar</button>' +
           '<button class="btn btn-sec btn-sm" data-novasec="' + l.id + '">' + ICON.mais + 'Seção</button></div>' +
           '<div class="chips">' + (secs.length ? secs.map(function (s) {
-            return '<button class="chip' + (s.ativo ? '' : ' inativa') + '" data-edsec="' + s.id + '" title="Editar seção ' + h(s.numero) + (Number(s.aptos) ? ' · ' + s.aptos + ' eleitores aptos' : ' · sem eleitores aptos') + '">' + h(s.numero) +
-              '<small class="aptos">' + (Number(s.aptos) ? App.n(Number(s.aptos)) : '—') + '</small></button>';
+            return '<button class="chip' + (s.ativo ? '' : ' inativa') + (s.agregada_a ? ' agregada' : '') + '" data-edsec="' + s.id + '" title="Editar seção ' + h(s.numero) + (s.agregada_a ? ' · agregada à seção ' + h(s.agregada_a) : '') + (Number(s.aptos) ? ' · ' + s.aptos + ' eleitores aptos' : ' · sem eleitores aptos') + '">' + h(s.numero) +
+              '<small class="aptos">' + (s.agregada_a ? '→ ' + h(s.agregada_a) : (Number(s.aptos) ? App.n(Number(s.aptos)) : '—')) + '</small></button>';
           }).join('') : '<span class="muted small">Nenhuma seção. Toque em "+ Seção".</span>') + '</div></div>';
       }).join('') : '<div class="card vazio">Nenhum local encontrado.</div>');
     $('#pl-mun').onchange = function () { paramMun = this.value; parLocais(); };
@@ -727,6 +727,7 @@
     var m = App.modal(App.cabecalhoModal(s ? 'Editar seção ' + s.numero : 'Nova seção', h(local.municipio)) +
       '<form id="ms-form"><div class="campo"><label for="ms-num">Número da seção</label><input class="input" id="ms-num" inputmode="numeric" value="' + (s ? h(s.numero) : '') + '" autofocus></div>' +
       '<div class="campo"><label for="ms-aptos">Eleitores aptos <span class="muted">(opcional)</span></label><input class="input" id="ms-aptos" inputmode="numeric" maxlength="5" value="' + (s && Number(s.aptos) ? h(s.aptos) : '') + '" placeholder="Ex.: 285"></div>' +
+      '<div class="campo"><label for="ms-agr">Agregada à seção <span class="muted">(só se o TSE juntou esta seção a outra)</span></label><input class="input" id="ms-agr" inputmode="numeric" maxlength="4" value="' + (s && s.agregada_a ? h(s.agregada_a) : '') + '" placeholder="Deixe vazio se a seção tem urna própria"><div class="ajuda">Os votos desta seção ficam no boletim de urna da seção principal. Ela conta como apurada junto com a principal e aparece tracejada no mapa.</div></div>' +
       '<div class="campo"><label for="ms-local">Local de votação</label><select class="input" id="ms-local">' + locs.map(function (x) { return '<option value="' + x.id + '"' + (x.id === localId ? ' selected' : '') + '>' + h(x.nome) + '</option>'; }).join('') + '</select></div>' +
       '<div class="chave-linha" style="border-top:1px solid var(--linha);padding-top:14px"><div><b>Seção ativa</b><span>Seções inativas não aparecem para os fiscais e não contam no total de urnas.</span></div><label class="switch"><input type="checkbox" id="ms-ativo"' + (!s || s.ativo ? ' checked' : '') + '><span class="trilho"></span></label></div>' +
       '<div class="acoes">' + (s ? '<button type="button" class="btn btn-perigo-sec" id="ms-excluir"' + (temEnvios ? ' disabled title="Tem envios: desative em vez de excluir"' : '') + '>' + ICON.lixo + 'Excluir</button>' : '') +
@@ -736,7 +737,7 @@
     function salvar(maisUma) {
       var b = $(maisUma ? '#ms-mais' : '#ms-salvar', m.el); App.carregando(b, true);
       var novoLocal = $('#ms-local', m.el).value;
-      return chamar('apuracao.salvarSecao', { id: s ? s.id : '', numero: $('#ms-num', m.el).value, local_id: novoLocal, ativo: $('#ms-ativo', m.el).checked, aptos: $('#ms-aptos', m.el).value.replace(/\D/g, '') }).then(function () {
+      return chamar('apuracao.salvarSecao', { id: s ? s.id : '', numero: $('#ms-num', m.el).value, local_id: novoLocal, ativo: $('#ms-ativo', m.el).checked, aptos: $('#ms-aptos', m.el).value.replace(/\D/g, ''), agregada_a: $('#ms-agr', m.el).value.replace(/\D/g, '') }).then(function () {
         App.toast('Seção ' + $('#ms-num', m.el).value + ' salva.', 'ok'); m.fechar();
         return recarregarParametros().then(function () { if (maisUma) modalSecao(null, novoLocal); });
       }).catch(function (e) { App.toast(e.message, 'erro'); App.carregando(b, false); });
