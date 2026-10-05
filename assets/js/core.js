@@ -25,7 +25,9 @@ var Core = (function () {
     /* Apuração TSE (resultado oficial estadual) */
     TSE_PARTIDOS: ['id', 'sigla', 'agremiacao', 'votos', 'origem', 'atualizado_em'],
     TSE_CANDIDATOS: ['id', 'numero', 'nome', 'partido', 'situacao', 'votos', 'origem', 'atualizado_em'],
-    TSE_HISTORICO: ['t', 'votos_validos', 'qe', 'vagas_partido', 'candidato_votos', 'candidato_pct_qe', 'marco']
+    TSE_HISTORICO: ['t', 'votos_validos', 'qe', 'vagas_partido', 'candidato_votos', 'candidato_pct_qe', 'marco'],
+    /* Cópia do resultado do TSE por seção nos outros municípios (só arquivo; o site usa assets/data/tse-es-2026.json) */
+    ARQUIVO_TSE: ['municipio', 'zona', 'nr_local', 'local', 'bairro', 'secao', 'aptos', 'agregada_a', 'votos']
   };
 
   var STATUS = { PENDENTE: 'PENDENTE', VALIDADO: 'VALIDADO', REJEITADO: 'REJEITADO', DESCARTADO: 'DESCARTADO' };
@@ -466,6 +468,42 @@ var Core = (function () {
     };
   };
   function ehTotalId(id) { return /^TOT-/.test(String(id || '')); }
+
+  /* Tira das abas consultadas toda hora os dados do estado importados do TSE (ficam no arquivo do site
+   * e numa cópia na aba ARQUIVO_TSE). Mantém o município principal e tudo o que a equipe lançou. */
+  function arquivarEstado(db) {
+    var cfg = lerConfig(db), principal = norm(cfg.municipio_principal || 'ANCHIETA');
+    var locais = mapLocais(db), secoes = mapSecoes(db), lancs = mapLancamentos(db);
+    var ehTse = function (l) { return l.origem === 'TSE' && norm(l.municipio) !== principal; };
+    var lancFica = lancs.filter(function (l) { return !ehTse(l); });
+    var locUsado = {}, secUsada = {};
+    lancFica.forEach(function (l) { if (l.local_id) locUsado[l.local_id] = true; if (l.secao_id) secUsada[l.secao_id] = true; });
+    // locais do estado = os que vieram do TSE (têm nº do local) fora do município principal
+    var doEstado = {}; locais.forEach(function (l) { if (norm(l.municipio) !== principal && l.nr_local) doEstado[l.id] = l; });
+    if (!Object.keys(doEstado).length && lancFica.length === lancs.length) return { arquivadas: 0, mantidos: lancs.length, mensagem: 'Nada para arquivar.' };
+    var votos = {}; lancs.forEach(function (l) { if (ehTse(l)) votos[l.secao_id] = l.votos; });
+    var arquivo = db.read('ARQUIVO_TSE').map(function (r) { var o = {}; SCHEMA.ARQUIVO_TSE.forEach(function (k) { o[k] = r[k]; }); return o; });
+    var jaTem = {}; arquivo.forEach(function (a) { jaTem[norm(a.municipio) + '#' + String(a.zona) + '#' + String(a.secao)] = true; });
+    var secSai = {};
+    secoes.forEach(function (s) {
+      var l = doEstado[s.local_id]; if (!l) return;
+      if (!secUsada[s.id]) secSai[s.id] = true;
+      var k = norm(l.municipio) + '#' + (s.zona || l.zona) + '#' + s.numero; if (jaTem[k]) return;
+      jaTem[k] = true;
+      arquivo.push({ municipio: l.municipio, zona: s.zona || l.zona, nr_local: l.nr_local, local: l.nome, bairro: l.bairro, secao: s.numero, aptos: s.aptos || '', agregada_a: s.agregada_a || '',
+        votos: s.agregada_a ? '' : (votos[s.id] === undefined ? '' : votos[s.id]) });
+    });
+    var secFica = secoes.filter(function (s) { return !secSai[s.id]; });
+    var temSecao = {}; secFica.forEach(function (s) { temSecao[s.local_id] = true; });
+    var locFica = locais.filter(function (l) { return !doEstado[l.id] || locUsado[l.id] || temSecao[l.id]; });
+    db.replaceAll('ARQUIVO_TSE', arquivo);
+    db.replaceAll('LANCAMENTOS', lancFica.map(rowLanc));
+    db.replaceAll('SECOES', secFica.map(rowSec));
+    db.replaceAll('LOCAIS', locFica.map(rowLocal));
+    log(db, 'sistema', 'ARQUIVAR_ESTADO', (lancs.length - lancFica.length) + ' lançamentos do TSE, ' + (secoes.length - secFica.length) + ' seções e ' + (locais.length - locFica.length) + ' locais movidos para ARQUIVO_TSE');
+    return { arquivadas: secoes.length - secFica.length, lancamentosRemovidos: lancs.length - lancFica.length, locaisRemovidos: locais.length - locFica.length,
+      ficaram: { lancamentos: lancFica.length, secoes: secFica.length, locais: locFica.length }, linhasArquivo: arquivo.length };
+  }
 
   /* ---------- Apuração ---------- */
   function exigeApuracao(db, req) { return autenticar(db, req.token, [PERFIS.APURACAO]); }
@@ -1447,7 +1485,7 @@ var Core = (function () {
 
   return {
     SCHEMA: SCHEMA, STATUS: STATUS, PERFIS: PERFIS, SEED: SEED, CONFIG_PADRAO: CONFIG_PADRAO,
-    handle: handle, instalar: instalar, executarTseAutomatico: executarTseAutomatico, resolverUrnas: resolverUrnas, completarAptos: completarAptos, completarAgregadas: completarAgregadas, normalizarResultadoTse: normalizarResultadoTse,
+    handle: handle, instalar: instalar, executarTseAutomatico: executarTseAutomatico, resolverUrnas: resolverUrnas, completarAptos: completarAptos, completarAgregadas: completarAgregadas, arquivarEstado: arquivarEstado, normalizarResultadoTse: normalizarResultadoTse,
     sha256: sha256, hmac: hmac, norm: norm, int: int,
     ehTotal: function (l) { return /^TOT-/.test(String(l && l.secao_id || '')); }
   };

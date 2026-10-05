@@ -7,7 +7,12 @@ var Relat = (function () {
   /* Converte os dados da apuração no formato usado pelo painel */
   function visao(d) {
     var urnas = Core.resolverUrnas(d.lancamentos);
-    return { config: d.config, locais: d.locais, secoes: d.secoes, urnas: Object.keys(urnas).map(function (k) { return urnas[k]; }), _urnasPorSecao: urnas };
+    var v = { config: d.config, locais: d.locais, secoes: d.secoes, urnas: Object.keys(urnas).map(function (k) { return urnas[k]; }) };
+    // resultado oficial do TSE dos outros municípios (arquivo fixo do site)
+    if (window.EstadoTSE) v = EstadoTSE.mesclar(v);
+    var porSecao = {}; v.urnas.forEach(function (u) { porSecao[u.secao_id] = u; });
+    v._urnasPorSecao = porSecao;
+    return v;
   }
   function municipios(v) {
     var principal = String(v.config.municipio_principal || 'ANCHIETA').toUpperCase();

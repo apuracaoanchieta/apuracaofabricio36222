@@ -52,7 +52,8 @@
   function carregar(mostrarErro) {
     if (ocupado) return;
     ocupado = true;
-    App.api('mapa.dados', { token: sess.token }).then(function (r) {
+    Promise.all([App.api('partido.dados', { token: sess.token }), EstadoTSE.carregar()]).then(function (x) {
+      var r = MapaES.deVisao(EstadoTSE.mesclar(x[0]));
       resp = r;
       $('#t-atualizado').lastChild.textContent = 'Atualizado às ' + App.hora(r.agora);
       return mapa.atualizar(r).then(function (d) { dados = d; renderKpis(); renderTabela(); if (!sel) renderLado(); });

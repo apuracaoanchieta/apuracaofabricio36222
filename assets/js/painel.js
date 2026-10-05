@@ -163,10 +163,10 @@ var Painel = (function () {
       '<section class="card"><div class="card-titulo"><h3>Mapa das urnas</h3><span class="muted tiny">número da seção e votos</span></div><div class="mapa" id="p-mapa"></div></section>' +
       '<section class="card"><div class="card-titulo"><h3>Resumo por local</h3></div><div class="tabela-wrap"><table class="tabela responsiva" id="p-tabela"></table></div></section>';
 
-    $('#p-mun', raiz).addEventListener('change', function () { municipio = this.value; localSel = ''; if (ultimo) atualizar(ultimo); });
-    $('#p-local', raiz).addEventListener('change', function () { localSel = this.value; if (ultimo) atualizar(ultimo); });
-    $('#p-sit', raiz).addEventListener('change', function () { situacao = this.value; if (ultimo) atualizar(ultimo); });
-    $('#p-limpar', raiz).addEventListener('click', function () { localSel = ''; situacao = 'TODAS'; $('#p-sit', raiz).value = 'TODAS'; if (ultimo) atualizar(ultimo); });
+    $('#p-mun', raiz).addEventListener('change', function () { municipio = this.value; localSel = ''; if (bruto) atualizar(bruto); });
+    $('#p-local', raiz).addEventListener('change', function () { localSel = this.value; if (bruto) atualizar(bruto); });
+    $('#p-sit', raiz).addEventListener('change', function () { situacao = this.value; if (bruto) atualizar(bruto); });
+    $('#p-limpar', raiz).addEventListener('click', function () { localSel = ''; situacao = 'TODAS'; $('#p-sit', raiz).value = 'TODAS'; if (bruto) atualizar(bruto); });
 
     function opcoesLocal(dados) {
       var todos = municipio === '__TODOS__', alvo = Core.norm(municipio);
@@ -209,7 +209,12 @@ var Painel = (function () {
       sel.closest('.filtro').hidden = lista.length < 2;
     }
 
-    function atualizar(dados) {
+    var bruto = null;
+    function atualizar(dadosPlanilha) {
+      // soma o resultado oficial do TSE dos outros municípios (arquivo fixo do site)
+      bruto = dadosPlanilha;
+      var dados = window.EstadoTSE ? EstadoTSE.mesclar(dadosPlanilha) : dadosPlanilha;
+      if (window.EstadoTSE && !dados.estadoTse) EstadoTSE.carregar().then(function (j) { if (j && bruto === dadosPlanilha) atualizar(bruto); });
       ultimo = dados;
       opcoesMunicipio(dados);
       opcoesLocal(dados);

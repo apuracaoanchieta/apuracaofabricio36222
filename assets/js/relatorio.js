@@ -29,7 +29,7 @@
   function carregar() {
     var b = $('#r-atualizar'); App.carregando(b, true, 'Atualizando…');
     $('#rel').innerHTML = '<p class="rel-carregando">Carregando os dados da apuração…</p>';
-    return App.api('apuracao.dados', { token: sess.token }).then(function (r) {
+    return Promise.all([App.api('apuracao.dados', { token: sess.token }), window.EstadoTSE ? EstadoTSE.carregar() : null]).then(function (x) { var r = x[0];
       var primeira = !dados;
       dados = r;
       // estado inteiro (milhares de seções): começa pelo resumo; o detalhe por seção fica para um município

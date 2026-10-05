@@ -86,7 +86,9 @@
     requestAnimationFrame(passo);
   }
 
-  function desenhar(d) {
+  function desenhar(dPlanilha) {
+    var d = window.EstadoTSE ? EstadoTSE.mesclar(dPlanilha) : dPlanilha;
+    if (window.EstadoTSE && !d.estadoTse) EstadoTSE.carregar().then(function (j) { if (j && ultimo === dPlanilha) desenhar(ultimo); });
     var principal = opcoesMunicipio(d);
     var st = Painel.calcular(d, municipio);
     $('#t-mun').textContent = municipio === '__TODOS__' ? 'TODOS OS MUNICÍPIOS' : municipio;
