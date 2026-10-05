@@ -364,6 +364,12 @@ textarea.input { min-height: 110px; resize: vertical; }
 .chip.PENDENTE { background: repeating-linear-gradient(135deg, var(--pendente) 0 5px, #f47a1d 5px 9px); color: #fff; }
 .chip.dup { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--perigo); }
 .chip.inativa { opacity: .45; text-decoration: line-through; }
+.chip.agregada { background: #fff; color: var(--azul-esc); border: 1.5px dashed var(--azul-esc); }
+.chip.agregada small { color: var(--azul-esc); opacity: .85; }
+.chip.agregada.VALIDADO { background: #e3f1f7; }
+.chip.agregada.PENDENTE { background: #fff3e8; border-color: var(--pendente); color: #a84800; }
+.chip.agregada.PENDENTE small { color: #a84800; }
+.legenda .l-agr { background: #fff; border: 1.5px dashed var(--azul-esc); }
 button.chip { cursor: pointer; border: 1px solid var(--linha-forte); background: #fff; color: var(--texto); }
 button.chip:hover { border-color: var(--azul); }
 
