@@ -80,12 +80,12 @@
       $('#tm-rot-total').textContent = 'VOTOS EM ' + m.nome;
       $('#tm-votos').textContent = n(m.votos);
       $('#tm-sub').innerHTML = '<b>' + MapaES.pct(m.votos, dados.total) + '</b> dos votos dele no estado' + (m.aptos ? ' · <b>' + MapaES.pct(m.votos, m.aptos, 2) + '</b> dos eleitores' : '') + (pos && m.votos ? ' · <b>' + pos + 'º</b> município' : '');
-      $('#tm-rot-rank').textContent = 'LOCAIS DE VOTAÇÃO COM MAIS VOTOS';
-      var maxL = m.locais[0] ? m.locais[0].votos : 1;
-      $('#tm-ranking').innerHTML = m.locais.filter(function (l) { return l.votos; }).slice(0, 7).map(function (l, i) {
-        return '<li><span class="p">' + (i + 1) + 'º</span><span class="nm">' + h(l.nome) + '<i><b style="width:' + Math.max(2, l.votos / maxL * 100) + '%"></b></i></span><span class="v">' + n(l.votos) + '</span></li>';
-      }).join('') || '<li><span></span><span class="nm">Nenhum voto neste município</span><span></span></li>';
-      $('#tm-rodape').textContent = m.locais.length + ' locais de votação · ' + m.locais.filter(function (l) { return l.votos; }).length + ' com voto (círculos laranja no mapa)';
+      $('#tm-rot-rank').textContent = 'MUNICÍPIOS COM MAIS VOTOS';
+      var maxM = com[0] ? com[0].votos : 1, ini = Math.max(0, Math.min(pos - 4, com.length - 7));
+      $('#tm-ranking').innerHTML = com.slice(ini, ini + 7).map(function (x, i) {
+        return '<li' + (x.chave === m.chave ? ' class="atual"' : '') + '><span class="p">' + (ini + i + 1) + 'º</span><span class="nm">' + h(x.nome) + '<i><b style="width:' + Math.max(2, x.votos / maxM * 100) + '%"></b></i></span><span class="v">' + n(x.votos) + '</span></li>';
+      }).join('');
+      $('#tm-rodape').textContent = m.secoes ? m.apuradas + ' de ' + m.secoes + ' seções apuradas · ' + n(m.aptos) + ' eleitores aptos' : '';
     }
   }
 
@@ -94,13 +94,13 @@
     if (!dados) return;
     var com = ranking().filter(function (m) { return m.votos > 0; }).slice(0, 12);
     if (!com.length) return;
-    if (mapa.selecionado()) { mapa.selecionar(null); return; }
-    idxTour = (idxTour + 1) % com.length;
-    mapa.selecionar(com[idxTour].chave);
+    // estado → 1º → 2º … → 12º → estado (8 s cada)
+    idxTour = idxTour + 1 >= com.length ? -1 : idxTour + 1;
+    mapa.selecionar(idxTour < 0 ? null : com[idxTour].chave);
   }
   function ajustarTour() {
     clearInterval(timerTour);
-    if (tour) timerTour = setInterval(passo, 12000); else if (mapa && mapa.selecionado()) mapa.selecionar(null);
+    if (tour) timerTour = setInterval(passo, 8000); else if (mapa && mapa.selecionado()) mapa.selecionar(null);
     ajustarBotoes();
     var u = new URL(location.href); if (tour) u.searchParams.set('passeio', '1'); else u.searchParams.delete('passeio');
     if (metrica === 'pct') u.searchParams.set('metrica', 'pct'); else u.searchParams.delete('metrica'); history.replaceState(null, '', u);

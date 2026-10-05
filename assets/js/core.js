@@ -461,7 +461,7 @@ var Core = (function () {
     return {
       config: configPublica(cfg),
       municipios: Object.keys(porMun).map(function (k) { return porMun[k]; }),
-      locais: ls.map(function (o) { return [o.id, o.municipio, o.nome, o.bairro || '', o.lat, o.lng, o.votos, o.secoes, o.apuradas, o.aptos, o.zona || '']; }),
+      locais: [], // o mapa mostra só municípios (pedido da campanha); os locais continuam na Apuração
       agora: db.stamp()
     };
   };

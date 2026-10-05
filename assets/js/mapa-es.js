@@ -131,9 +131,9 @@ var MapaES = (function () {
         (m ? '<span class="v">' + App.n(m.votos) + ' voto' + (m.votos === 1 ? '' : 's') + '</span>' +
           '<span>' + pct(m.votos, estado.dados.total) + ' dos votos dele no estado</span>' +
           (m.aptos ? '<span>' + pct(m.votos, m.aptos, 2) + ' dos eleitores da cidade</span>' : '') +
-          '<span>' + m.apuradas + ' de ' + m.secoes + ' seções · ' + m.locais.length + ' locais</span>'
+          '<span>' + m.apuradas + ' de ' + m.secoes + ' seções apuradas</span>'
           : '<span>Sem dados no sistema</span>') +
-        (!opcoes.semClique ? '<em>' + (estado.sel === k ? 'Clique para voltar ao estado' : 'Clique para ver os locais de votação') + '</em>' : '');
+        (!opcoes.semClique ? '<em>' + (estado.sel === k ? 'Clique para tirar a seleção' : 'Clique para ver os detalhes') + '</em>' : '');
       dica.hidden = false; moverDica(e);
     }
     function mostrarDicaLocal(l, e) {
@@ -177,15 +177,9 @@ var MapaES = (function () {
       Object.keys(paths).forEach(function (x) { paths[x].classList.toggle('apagado', !!estado.sel && x !== estado.sel); paths[x].classList.toggle('ativo', x === estado.sel); });
       gSel.innerHTML = ''; gPts.innerHTML = ''; gRot.innerHTML = '';
       if (estado.sel) {
-        var p = paths[estado.sel], b = p.__bbox, w = b[2] - b[0], hh = b[3] - b[1], m = Math.max(w, hh) * 0.12;
-        var c = p.cloneNode(false); c.removeAttribute('tabindex'); c.setAttribute('class', 'mes-mun-borda'); gSel.appendChild(c);
-        // mantém a proporção da área do mapa
-        var ar = (svg.clientWidth || 600) / (svg.clientHeight || 600), vw = w + 2 * m, vh = hh + 2 * m;
-        if (vw / vh < ar) vw = vh * ar; else vh = vw / ar;
-        var vb = [b[0] + w / 2 - vw / 2, b[1] + hh / 2 - vh / 2, vw, vh];
-        definirViewBox(vb, animar !== false);
-        desenharPontos(estado.sel);
-      } else definirViewBox(estado.vbEstado, animar !== false);
+        // só o município: destaca o contorno, sem aproximar e sem locais de votação
+        var c = paths[estado.sel].cloneNode(false); c.removeAttribute('tabindex'); c.setAttribute('class', 'mes-mun-borda'); gSel.appendChild(c);
+      }
       if (opcoes.aoSelecionar) opcoes.aoSelecionar(estado.sel ? estado.dados && estado.dados.muns[estado.sel] || { nome: paths[estado.sel].__nome.toUpperCase(), chave: estado.sel, votos: 0, secoes: 0, apuradas: 0, aptos: 0, locais: [] } : null);
     }
     function desenharPontos(k) {
@@ -213,7 +207,7 @@ var MapaES = (function () {
       Array.prototype.forEach.call(gPts.childNodes, function (c) { if (Math.abs(+c.getAttribute('cx') - p[0]) < .01 && Math.abs(+c.getAttribute('cy') - p[1]) < .01) { c.classList.add('destaque'); gPts.appendChild(c); } });
     }
 
-    window.addEventListener('resize', function () { if (estado.sel) selecionar(estado.sel, false); else { estado.vb = null; definirViewBox(estado.vbEstado, false); } });
+    window.addEventListener('resize', function () { estado.vb = null; definirViewBox(estado.vbEstado, false); });
 
     var pronto = carregarGeo().then(function (geo) { estado.geo = geo; desenharBase(geo); if (estado.dados) pintar(); });
 
@@ -224,7 +218,7 @@ var MapaES = (function () {
         esconderDica();
         return pronto.then(function () {
           pintar();
-          if (estado.sel) { gPts.innerHTML = ''; desenharPontos(estado.sel); if (opcoes.aoSelecionar) opcoes.aoSelecionar(estado.dados.muns[estado.sel] || null); }
+          if (estado.sel && opcoes.aoSelecionar) opcoes.aoSelecionar(estado.dados.muns[estado.sel] || null);
           return estado.dados;
         });
       },

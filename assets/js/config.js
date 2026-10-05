@@ -10,5 +10,5 @@
  * ===================================================================== */
 window.APP_CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbyfCAMyTsh4L1xwvbePXzqJVZ5y8og6CFfu0Sdeg9HUz-Agd6R2OsUbpVGOhPplNEaZ/exec',
-  ATUALIZAR_A_CADA_SEGUNDOS: 30
+  ATUALIZAR_A_CADA_SEGUNDOS: 90
 };
