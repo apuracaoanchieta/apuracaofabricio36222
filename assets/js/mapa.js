@@ -1,6 +1,12 @@
 /* MAPA DOS VOTOS — tela para a Apuração e para o candidato (somente visualização). */
 (function () {
   'use strict';
+  /* votos válidos por município (TSE): carregam à parte e, quando chegam, a tela é redesenhada */
+  var validosCache = null;
+  function pedirValidos(depois) {
+    if (validosCache || !window.EstadoTSE) return;
+    EstadoTSE.validos().then(function (v) { if (v && Object.keys(v).length && !validosCache) { validosCache = v; depois(); } });
+  }
   var $ = App.$, $$ = App.$$, h = App.h, n = App.n, ICON = App.ICON;
   var area = App.sessao.get('apuracao') ? 'apuracao' : 'partido';
   var sess = App.sessao.get(area);
@@ -51,10 +57,11 @@
   }
 
   function carregar(mostrarErro) {
+    pedirValidos(function () { carregar(false); });
     if (ocupado) return;
     ocupado = true;
     Promise.all([App.api('partido.dados', { token: sess.token }), EstadoTSE.carregar()]).then(function (x) {
-      var r = MapaES.deVisao(EstadoTSE.mesclar(x[0]));
+      var r = MapaES.deVisao(EstadoTSE.mesclar(x[0]), validosCache);
       resp = r;
       $('#t-atualizado').lastChild.textContent = 'Atualizado às ' + App.hora(r.agora);
       return mapa.atualizar(r).then(function (d) { dados = d; renderKpis(); renderTabela(); if (!sel) renderLado(); });
@@ -69,12 +76,14 @@
   function renderKpis() {
     var todos = lista(), com = todos.filter(function (m) { return m.votos > 0; });
     var melhor = com.slice().sort(function (a, b) { return b.votos - a.votos; })[0];
-    var melhorPct = com.filter(function (m) { return m.aptos; }).sort(function (a, b) { return b.votos / b.aptos - a.votos / a.aptos; })[0];
+    var temVal = dados.validos > 0;
+    var melhorPct = temVal ? com.filter(function (m) { return m.validos; }).sort(function (a, b) { return b.votos / b.validos - a.votos / a.validos; })[0]
+      : com.filter(function (m) { return m.aptos; }).sort(function (a, b) { return b.votos / b.aptos - a.votos / a.aptos; })[0];
     $('#m-kpis').innerHTML =
-      '<div class="kpi destaque"><div class="rot">Votos no Espírito Santo</div><div class="val num">' + n(dados.total) + '</div><div class="det">' + (dados.aptos ? MapaES.pct(dados.total, dados.aptos, 2) + ' dos eleitores dos municípios no sistema' : '') + '</div></div>' +
+      '<div class="kpi destaque"><div class="rot">Votos no Espírito Santo</div><div class="val num">' + n(dados.total) + '</div><div class="det">' + (temVal ? MapaES.pct(dados.total, dados.validos, 2) + ' dos votos válidos do estado' : (dados.aptos ? MapaES.pct(dados.total, dados.aptos, 2) + ' dos eleitores do estado' : '')) + '</div></div>' +
       '<div class="kpi"><div class="rot">Municípios com voto</div><div class="val num">' + com.length + ' <span class="de">/ ' + todos.length + '</span></div><div class="det">' + (todos.length - com.length) + ' sem nenhum voto</div></div>' +
       '<div class="kpi"><div class="rot">Mais votos</div><div class="val val-txt">' + (melhor ? h(melhor.nome) : '—') + '</div><div class="det">' + (melhor ? n(melhor.votos) + ' votos · ' + MapaES.pct(melhor.votos, dados.total) + ' do total' : '') + '</div></div>' +
-      '<div class="kpi"><div class="rot">Maior % dos eleitores</div><div class="val val-txt">' + (melhorPct ? h(melhorPct.nome) : '—') + '</div><div class="det">' + (melhorPct ? MapaES.pct(melhorPct.votos, melhorPct.aptos, 2) + ' dos eleitores da cidade' : '') + '</div></div>';
+      '<div class="kpi"><div class="rot">' + (temVal ? 'Maior % dos votos válidos' : 'Maior % dos eleitores') + '</div><div class="val val-txt">' + (melhorPct ? h(melhorPct.nome) : '—') + '</div><div class="det">' + (melhorPct ? (temVal ? MapaES.pct(melhorPct.votos, melhorPct.validos, 2) + ' dos votos válidos da cidade' : MapaES.pct(melhorPct.votos, melhorPct.aptos, 2) + ' dos eleitores da cidade') : '') + '</div></div>';
   }
 
   function renderLegenda(lg) {
@@ -101,7 +110,7 @@
       var pos = 0; todosR.forEach(function (x, i) { if (x.chave === m.chave) pos = i + 1; });
       el.innerHTML = '<div class="lado-cab"><h3>' + h(m.nome) + '</h3><button type="button" class="btn btn-ghost btn-sm" id="m-fechar">Ver todos</button></div>' +
         '<div class="lado-kpis"><div><b class="num">' + n(m.votos) + '</b><span>votos</span></div><div><b class="num">' + (pos ? pos + 'º' : '—') + '</b><span>no ranking dos municípios</span></div>' +
-        '<div><b class="num">' + MapaES.pct(m.votos, dados.total) + '</b><span>do total dele no estado</span></div><div><b class="num">' + (m.aptos ? MapaES.pct(m.votos, m.aptos, 2) : '—') + '</b><span>dos eleitores da cidade</span></div>' +
+        '<div><b class="num">' + MapaES.pct(m.votos, dados.total) + '</b><span>do total dele no estado</span></div><div><b class="num">' + (m.validos ? MapaES.pct(m.votos, m.validos, 2) : '—') + '</b><span>dos votos válidos da cidade</span></div><div><b class="num">' + (m.validos ? n(m.validos) : '—') + '</b><span>votos válidos na cidade</span></div><div><b class="num">' + (m.aptos ? MapaES.pct(m.votos, m.aptos, 2) : '—') + '</b><span>dos eleitores da cidade</span></div>' +
         '<div><b class="num">' + (m.aptos ? n(m.aptos) : '—') + '</b><span>eleitores aptos</span></div><div><b class="num">' + (m.secoes ? m.apuradas + '/' + m.secoes : '—') + '</b><span>seções apuradas</span></div></div>' +
         (m.votos ? '' : '<p class="muted small">Ele não teve nenhum voto neste município.</p>');
       $('#m-fechar').onclick = function () { mapa.selecionar(null); };
@@ -111,14 +120,15 @@
 
   function renderTabela() {
     var todos = lista();
-    var f = { nome: function (m) { return m.nome; }, votos: function (m) { return m.votos; }, pct: function (m) { return m.aptos ? m.votos / m.aptos : -1; }, aptos: function (m) { return m.aptos; }, secoes: function (m) { return m.secoes; } }[ordem.campo];
+    var f = { nome: function (m) { return m.nome; }, votos: function (m) { return m.votos; }, pct: function (m) { return m.aptos ? m.votos / m.aptos : -1; }, val: function (m) { return m.validos ? m.votos / m.validos : -1; }, aptos: function (m) { return m.aptos; }, secoes: function (m) { return m.secoes; } }[ordem.campo];
     todos.sort(function (a, b) { var x = f(a), y = f(b); var c = typeof x === 'string' ? x.localeCompare(y, 'pt-BR') : x - y; return ordem.desc ? -c : c; });
     function th(campo, txt, cls) { return '<th class="' + (cls || '') + ' ordenavel' + (ordem.campo === campo ? ' ord-' + (ordem.desc ? 'desc' : 'asc') : '') + '" data-ord="' + campo + '">' + txt + '</th>'; }
     $('#m-tab-sub').textContent = 'clique no título da coluna para ordenar';
-    $('#m-tabela').innerHTML = '<thead><tr>' + th('nome', 'Município') + th('votos', 'Votos', 'r') + '<th class="r">% do total</th>' + th('aptos', 'Eleitores', 'r') + th('pct', '% dos eleitores', 'r') + th('secoes', 'Seções', 'r') + '</tr></thead><tbody>' +
+    $('#m-tabela').innerHTML = '<thead><tr>' + th('nome', 'Município') + th('votos', 'Votos', 'r') + '<th class="r">% do total</th>' + th('val', '% dos válidos', 'r') + th('aptos', 'Eleitores', 'r') + th('pct', '% dos eleitores', 'r') + th('secoes', 'Seções', 'r') + '</tr></thead><tbody>' +
       todos.map(function (m) {
         return '<tr class="' + (m.votos ? '' : 'linha-zero') + '"><td data-l="Município"><button type="button" class="link" data-mun="' + h(m.chave) + '">' + h(m.nome) + '</button></td>' +
           '<td data-l="Votos" class="r num"><b>' + n(m.votos) + '</b></td><td data-l="% do total" class="r num">' + MapaES.pct(m.votos, dados.total) + '</td>' +
+          '<td data-l="% dos válidos" class="r num">' + (m.validos ? MapaES.pct(m.votos, m.validos, 2) : '—') + '</td>' +
           '<td data-l="Eleitores" class="r num">' + (m.aptos ? n(m.aptos) : '—') + '</td><td data-l="% dos eleitores" class="r num">' + (m.aptos ? MapaES.pct(m.votos, m.aptos, 2) : '—') + '</td>' +
           '<td data-l="Seções" class="r num">' + (m.semDado ? '—' : m.apuradas + '/' + m.secoes) + '</td></tr>';
       }).join('') + '</tbody>';

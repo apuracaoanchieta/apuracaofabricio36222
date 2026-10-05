@@ -20,18 +20,18 @@ var MapaES = (function () {
 
   /* Organiza a resposta de mapa.dados */
   function preparar(d) {
-    var muns = {}, total = 0, aptos = 0;
+    var muns = {}, total = 0, aptos = 0, validos = 0;
     d.municipios.forEach(function (m) {
       var k = norm(m.municipio);
-      muns[k] = { chave: k, nome: m.municipio, votos: m.votos, secoes: m.secoes, apuradas: m.apuradas, aptos: m.aptos, pendentes: m.pendentes || 0, locais: [] };
-      total += m.votos; aptos += m.aptos;
+      muns[k] = { chave: k, nome: m.municipio, votos: m.votos, secoes: m.secoes, apuradas: m.apuradas, aptos: m.aptos, validos: m.validos || 0, pendentes: m.pendentes || 0, locais: [] };
+      total += m.votos; aptos += m.aptos; validos += m.validos || 0;
     });
     d.locais.forEach(function (x) {
       var k = norm(x[1]), m = muns[k]; if (!m) return;
       m.locais.push({ id: x[0], nome: x[2], bairro: x[3], lat: x[4], lng: x[5], votos: x[6], secoes: x[7], apuradas: x[8], aptos: x[9], zona: x[10] });
     });
     Object.keys(muns).forEach(function (k) { muns[k].locais.sort(function (a, b) { return b.votos - a.votos || a.nome.localeCompare(b.nome, 'pt-BR'); }); });
-    return { muns: muns, total: total, aptos: aptos };
+    return { muns: muns, total: total, aptos: aptos, validos: validos };
   }
 
   /* quebras por quantis entre os municípios com voto (5 faixas) */
@@ -98,7 +98,12 @@ var MapaES = (function () {
     }
 
     function nomeExibir(k) { var m = estado.dados && estado.dados.muns[k]; return m ? m.nome : (paths[k] ? paths[k].__nome.toUpperCase() : k); }
-    function valorMun(m) { if (!m) return 0; return estado.metrica === 'pct' ? (m.aptos ? m.votos / m.aptos : 0) : m.votos; }
+    function valorMun(m) {
+      if (!m) return 0;
+      if (estado.metrica === 'pct') return m.aptos ? m.votos / m.aptos : 0;
+      if (estado.metrica === 'validos') return m.validos ? m.votos / m.validos : 0;
+      return m.votos;
+    }
 
     function pintar() {
       if (!estado.dados) return;
@@ -116,8 +121,8 @@ var MapaES = (function () {
       if (opcoes.aoPintar) opcoes.aoPintar(legenda());
     }
     function legenda() {
-      var qs = estado.qs || [], itens = [], fmt = estado.metrica === 'pct' ? function (v) { return pct(v, 1, 2); } : function (v) { return App.n(Math.round(v)); };
-      var ini = estado.metrica === 'pct' ? 0 : 1;
+      var qs = estado.qs || [], itens = [], fmt = estado.metrica !== 'votos' ? function (v) { return pct(v, 1, 2); } : function (v) { return App.n(Math.round(v)); };
+      var ini = estado.metrica !== 'votos' ? 0 : 1;
       for (var i = 0; i <= qs.length && i < RAMPA.length; i++) {
         var de = i === 0 ? ini : qs[i - 1], ate = qs[i];
         itens.push({ cor: RAMPA[i], texto: ate === undefined ? 'acima de ' + fmt(de) : (i === 0 ? 'até ' + fmt(ate) : fmt(de) + ' – ' + fmt(ate)) });
@@ -131,6 +136,7 @@ var MapaES = (function () {
       dica.innerHTML = '<b>' + App.h(m ? m.nome : paths[k].__nome) + '</b>' +
         (m ? '<span class="v">' + App.n(m.votos) + ' voto' + (m.votos === 1 ? '' : 's') + '</span>' +
           '<span>' + pct(m.votos, estado.dados.total) + ' dos votos dele no estado</span>' +
+          (m.validos ? '<span>' + pct(m.votos, m.validos, 2) + ' dos votos válidos da cidade</span>' : '') +
           (m.aptos ? '<span>' + pct(m.votos, m.aptos, 2) + ' dos eleitores da cidade</span>' : '') +
           '<span>' + m.apuradas + ' de ' + m.secoes + ' seções apuradas</span>'
           : '<span>Sem dados no sistema</span>') +
@@ -225,7 +231,7 @@ var MapaES = (function () {
       },
       selecionar: function (k, animar) { return pronto.then(function () { selecionar(k ? norm(k) : null, animar); }); },
       selecionado: function () { return estado.sel; },
-      metrica: function (m) { estado.metrica = m === 'pct' ? 'pct' : 'votos'; pintar(); },
+      metrica: function (m) { estado.metrica = m === 'pct' || m === 'validos' ? m : 'votos'; pintar(); },
       destacarLocal: destacarLocal,
       chaves: function () { return Object.keys(paths); },
       nomeDe: nomeExibir,
@@ -234,7 +240,7 @@ var MapaES = (function () {
   }
 
   /* Monta a resposta do mapa a partir dos dados do painel (planilha + resultado do TSE no estado) */
-  function deVisao(v) {
+  function deVisao(v, validosPorMun) {
     var locais = {}, porMun = {};
     v.locais.forEach(function (l) { locais[l.id] = l; });
     function mun(nome) { var k = norm(nome); return porMun[k] || (porMun[k] = { municipio: String(nome).toUpperCase(), votos: 0, secoes: 0, apuradas: 0, aptos: 0, pendentes: 0 }); }
@@ -246,6 +252,7 @@ var MapaES = (function () {
       if (conta[u.secao_id]) m.apuradas++;
     });
     Object.keys(porMun).forEach(function (k) { var m = porMun[k]; if (m.apuradas > m.secoes) m.apuradas = m.secoes; });
+    if (validosPorMun) Object.keys(validosPorMun).forEach(function (k) { var m = porMun[norm(k)]; if (m) m.validos = validosPorMun[k]; });
     return { config: v.config, municipios: Object.keys(porMun).map(function (k) { return porMun[k]; }), locais: [], agora: v.agora };
   }
 

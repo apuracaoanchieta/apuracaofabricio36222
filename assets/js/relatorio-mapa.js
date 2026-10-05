@@ -2,6 +2,12 @@
  * Mesmos dados da tela Mapa dos votos (planilha + resultado oficial do TSE no estado). */
 (function () {
   'use strict';
+  /* votos válidos por município (TSE): carregam à parte e, quando chegam, a tela é redesenhada */
+  var validosCache = null;
+  function pedirValidos(depois) {
+    if (validosCache || !window.EstadoTSE) return;
+    EstadoTSE.validos().then(function (v) { if (v && Object.keys(v).length && !validosCache) { validosCache = v; depois(); } });
+  }
   var $ = App.$, h = App.h, n = App.n;
   var area = App.sessao.get('apuracao') ? 'apuracao' : 'partido';
   var sess = App.sessao.get(area);
@@ -29,8 +35,9 @@
     var b = $('#r-atualizar'); App.carregando(b, true, 'Atualizando…');
     $('#rel').innerHTML = '<p class="rel-carregando">Carregando os votos de todos os municípios…</p>';
     mapa = null;
-    return Promise.all([App.api('partido.dados', { token: sess.token }), EstadoTSE.carregar(), MapaES.carregarGeo()]).then(function (x) {
-      resp = MapaES.deVisao(EstadoTSE.mesclar(x[0]));
+    return Promise.all([App.api('partido.dados', { token: sess.token }), EstadoTSE.carregar(), MapaES.carregarGeo(), EstadoTSE.validos()]).then(function (x) {
+      if (x[3] && Object.keys(x[3]).length) validosCache = x[3];
+      resp = MapaES.deVisao(EstadoTSE.mesclar(x[0]), validosCache);
       dados = MapaES.preparar(resp);
       desenhar();
     }).catch(function (e) {
@@ -61,7 +68,7 @@
     var cfg = resp.config || {}, lista = todos();
     var com = lista.filter(function (m) { return m.votos > 0; }).sort(function (a, b) { return b.votos - a.votos; });
     var sem = lista.filter(function (m) { return !(m.votos > 0); }).sort(function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); });
-    var melhorPct = com.filter(function (m) { return m.aptos; }).sort(function (a, b) { return b.votos / b.aptos - a.votos / a.aptos; })[0];
+    var melhorPct = com.filter(function (m) { return m.validos; }).sort(function (a, b) { return b.votos / b.validos - a.votos / a.validos; })[0];
     var secoes = 0, apuradas = 0; lista.forEach(function (m) { secoes += m.secoes; apuradas += m.apuradas; });
     var completo = secoes && apuradas >= secoes;
     var agora = new Date(), gerado = agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -75,10 +82,10 @@
       '<div class="rel-selo ' + (completo ? 'final' : 'parcial') + '">' + (completo ? 'RESULTADO FINAL' : 'RESULTADO PARCIAL') + '<small>' + pct(apuradas, secoes) + ' das seções</small></div></header>' +
 
       '<div class="rel-kpis rel-kpis-4">' +
-      '<div class="rel-kpi destaque"><span>Votos no Espírito Santo</span><b>' + n(dados.total) + '</b><em>' + (dados.aptos ? pct(dados.total, dados.aptos, 2) + ' dos eleitores do estado' : '') + '</em></div>' +
+      '<div class="rel-kpi destaque"><span>Votos no Espírito Santo</span><b>' + n(dados.total) + '</b><em>' + (dados.validos ? pct(dados.total, dados.validos, 2) + ' dos votos válidos do estado' : (dados.aptos ? pct(dados.total, dados.aptos, 2) + ' dos eleitores do estado' : '')) + '</em></div>' +
       '<div class="rel-kpi"><span>Municípios com voto</span><b>' + com.length + ' <small style="font-size:12pt;color:#4b6576">/ ' + lista.length + '</small></b><em>' + sem.length + ' sem nenhum voto</em></div>' +
       '<div class="rel-kpi"><span>Mais votos</span><b class="rel-kpi-txt">' + (com[0] ? h(com[0].nome) : '—') + '</b><em>' + (com[0] ? n(com[0].votos) + ' votos · ' + pct(com[0].votos, dados.total) + ' do total' : '') + '</em></div>' +
-      '<div class="rel-kpi"><span>Maior % dos eleitores</span><b class="rel-kpi-txt">' + (melhorPct ? h(melhorPct.nome) : '—') + '</b><em>' + (melhorPct ? pct(melhorPct.votos, melhorPct.aptos, 2) + ' dos eleitores da cidade' : '') + '</em></div>' +
+      '<div class="rel-kpi"><span>Maior % dos votos válidos</span><b class="rel-kpi-txt">' + (melhorPct ? h(melhorPct.nome) : '—') + '</b><em>' + (melhorPct ? pct(melhorPct.votos, melhorPct.validos, 2) + ' dos votos válidos da cidade' : '') + '</em></div>' +
       '</div>' +
 
       '<div class="relm-grade">' +
@@ -94,13 +101,13 @@
 
       '<footer class="rel-rodape"><p>Fonte: boletins de urna oficiais do TSE (resultados.tse.jus.br), seção por seção, somados por município' +
       (cfg.municipio_principal ? '; em ' + h(String(cfg.municipio_principal).toUpperCase()) + ', a apuração da campanha conferida com os boletins' : '') +
-      '. "% dos eleitores" = votos do candidato ÷ eleitores aptos do município. Cores do mapa em 5 faixas (do mais claro, menos votos, ao mais escuro, mais votos); hachurado = nenhum voto.</p>' +
+      '. "% dos válidos" = votos do candidato ÷ votos válidos para deputado estadual no município (votos em candidatos e legendas; brancos e nulos não entram). "% dos eleitores" = votos do candidato ÷ eleitores aptos do município. Cores do mapa em 5 faixas (do mais claro, menos votos, ao mais escuro, mais votos); hachurado = nenhum voto.</p>' +
       '<p class="rel-credito">Sistema de apuração desenvolvido por <b>DERYCK NOGUEIRA</b></p></footer>';
 
     mapa = MapaES.criar($('#rm-mapa'), {
       semClique: true,
       aoPintar: function (lg) {
-        $('#rm-legenda').innerHTML = '<b>' + (metrica === 'pct' ? '% dos eleitores' : 'Votos') + '</b>' + lg.itens.map(function (i) { return '<span><i style="background:' + i.cor + '"></i>' + i.texto + '</span>'; }).join('') + '<span><i class="zero"></i>sem votos</span>';
+        $('#rm-legenda').innerHTML = '<b>' + ({ votos: 'Votos', validos: '% dos votos válidos', pct: '% dos eleitores' }[metrica]) + '</b>' + lg.itens.map(function (i) { return '<span><i style="background:' + i.cor + '"></i>' + i.texto + '</span>'; }).join('') + '<span><i class="zero"></i>sem votos</span>';
       }
     });
     mapa.metrica(metrica);
@@ -115,15 +122,17 @@
     var pos = {}; rank.forEach(function (m, i) { pos[m.chave] = i + 1; });
     var f = { votos: function (a, b) { return b.votos - a.votos || a.nome.localeCompare(b.nome, 'pt-BR'); },
       pct: function (a, b) { return (b.aptos ? b.votos / b.aptos : -1) - (a.aptos ? a.votos / a.aptos : -1) || a.nome.localeCompare(b.nome, 'pt-BR'); },
+      validos: function (a, b) { return (b.validos ? b.votos / b.validos : -1) - (a.validos ? a.votos / a.validos : -1) || a.nome.localeCompare(b.nome, 'pt-BR'); },
       nome: function (a, b) { return a.nome.localeCompare(b.nome, 'pt-BR'); } }[ordem];
     lista.sort(f);
-    var t = { votos: 0, aptos: 0, secoes: 0, apuradas: 0 };
-    $('#rm-tabela').innerHTML = '<thead><tr><th class="r">Pos.</th><th>Município</th><th class="r">Votos</th><th class="r">% do total</th><th class="r">Eleitores</th><th class="r">% dos eleitores</th><th class="r">Seções</th></tr></thead><tbody>' +
+    var t = { votos: 0, aptos: 0, secoes: 0, apuradas: 0, validos: 0 };
+    $('#rm-tabela').innerHTML = '<thead><tr><th class="r">Pos.</th><th>Município</th><th class="r">Votos</th><th class="r">% do total</th><th class="r">Votos válidos</th><th class="r">% dos válidos</th><th class="r">Eleitores</th><th class="r">% dos eleitores</th><th class="r">Seções</th></tr></thead><tbody>' +
       lista.map(function (m) {
-        t.votos += m.votos; t.aptos += m.aptos; t.secoes += m.secoes; t.apuradas += m.apuradas;
+        t.votos += m.votos; t.aptos += m.aptos; t.secoes += m.secoes; t.apuradas += m.apuradas; t.validos += m.validos || 0;
         return '<tr' + (m.votos ? '' : ' class="zero"') + '><td class="r">' + (pos[m.chave] ? pos[m.chave] + 'º' : '—') + '</td><td>' + h(m.nome) + '</td><td class="r"><b>' + n(m.votos) + '</b></td><td class="r">' + pct(m.votos, dados.total) + '</td>' +
+          '<td class="r">' + (m.validos ? n(m.validos) : '—') + '</td><td class="r">' + (m.validos ? pct(m.votos, m.validos, 2) : '—') + '</td>' +
           '<td class="r">' + (m.aptos ? n(m.aptos) : '—') + '</td><td class="r">' + (m.aptos ? pct(m.votos, m.aptos, 2) : '—') + '</td><td class="r">' + (m.secoes ? m.apuradas + '/' + m.secoes : '—') + '</td></tr>';
-      }).join('') + '<tr class="total"><td></td><td>Total</td><td class="r">' + n(t.votos) + '</td><td class="r">100%</td><td class="r">' + n(t.aptos) + '</td><td class="r">' + pct(t.votos, t.aptos, 2) + '</td><td class="r">' + t.apuradas + '/' + t.secoes + '</td></tr></tbody>';
+      }).join('') + '<tr class="total"><td></td><td>Total</td><td class="r">' + n(t.votos) + '</td><td class="r">100%</td><td class="r">' + (t.validos ? n(t.validos) : '—') + '</td><td class="r">' + (t.validos ? pct(t.votos, t.validos, 2) : '—') + '</td><td class="r">' + n(t.aptos) + '</td><td class="r">' + pct(t.votos, t.aptos, 2) + '</td><td class="r">' + t.apuradas + '/' + t.secoes + '</td></tr></tbody>';
   }
 
   if (sess) iniciar(); else telaLogin();

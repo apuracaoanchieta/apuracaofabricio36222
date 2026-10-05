@@ -123,3 +123,4 @@
   .relm-mapa-svg { height: 128mm; }
   .relm-top li { padding: 2.5px 0; }
 }
+#rm-tabela { font-size: 8.6pt; } #rm-tabela th { font-size: 7pt; letter-spacing: .2px; padding: 4px 4px; } #rm-tabela td { padding: 3px 4px; } #rm-tabela td:nth-child(2) { white-space: nowrap; }

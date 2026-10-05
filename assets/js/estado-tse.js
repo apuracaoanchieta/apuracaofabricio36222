@@ -60,9 +60,38 @@ var EstadoTSE = (function () {
     return r;
   }
 
+  /* VOTOS VÁLIDOS de deputado estadual em cada município (nominais + legenda), do resultado oficial do TSE.
+   * Busca uma vez por navegador (78 arquivos do TSE) e guarda: o resultado é final. */
+  var CHAVE_VALIDOS = 'fp_validos_es_2026_v1', promValidos = null;
+  function validos() {
+    if (promValidos) return promValidos;
+    promValidos = Promise.resolve().then(function () {
+      try { var c = JSON.parse(localStorage.getItem(CHAVE_VALIDOS) || 'null'); if (c && c.n >= 78) return c.m; } catch (e) { /* sem cache */ }
+      return carregar().then(function (j) {
+        if (!j || !window.Core || !Core.normalizarResultadoTse) return {};
+        var lista = j.municipios.slice(), res = {}, ok = 0, i = 0;
+        function um() {
+          if (i >= lista.length) return Promise.resolve();
+          var m = lista[i++];
+          return fetch('https://resultados.tse.jus.br/oficial/ele2026/6259/dados/es/es' + m.cd + '-c0007-e006259-u.json')
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(function (raw) { var pv = Core.normalizarResultadoTse(raw), t = 0; pv.partidos.forEach(function (p) { t += Number(p.votos) || 0; }); if (t > 0) { res[norm(m.nome)] = t; ok++; } })
+            .catch(function () { /* fica sem esse município */ })
+            .then(um);
+        }
+        return Promise.all([um(), um(), um(), um(), um(), um(), um(), um()]).then(function () {
+          if (ok >= lista.length) { try { localStorage.setItem(CHAVE_VALIDOS, JSON.stringify({ n: ok, m: res })); } catch (e) { /* ok */ } }
+          else promValidos = null; // tenta de novo na próxima vez
+          return res;
+        });
+      });
+    });
+    return promValidos;
+  }
+
   function info() { return bruto ? { total: bruto.total, gerado: bruto.gerado, fonte: bruto.fonte } : null; }
 
   // já começa a baixar ao abrir a página (fica guardado no navegador)
   if (typeof window !== 'undefined' && !(window.APP_CONFIG && window.APP_CONFIG.API_URL === 'DEMO')) setTimeout(carregar, 0);
-  return { carregar: carregar, mesclar: mesclar, info: info, norm: norm };
+  return { carregar: carregar, mesclar: mesclar, validos: validos, info: info, norm: norm };
 })();
