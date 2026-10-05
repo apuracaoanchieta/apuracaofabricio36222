@@ -9,6 +9,7 @@
   App.bannerDemo('Senha: <b>apuracao</b> ou <b>partido</b>.');
   $$('[data-voltar]').forEach(function (e) { e.innerHTML = ICON.seta; });
   $('#btn-telao-mapa').innerHTML = ICON.tv + 'Modo telão';
+  $('#btn-rel-mapa').innerHTML = ICON.impressora + 'Relatório para impressão';
 
   function ajustarVoltar() {
     var ap = sess && sess.perfil === 'APURACAO';

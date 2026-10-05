@@ -90,3 +90,30 @@
 .rel-texto { font-size: 13.5px; line-height: 1.6; margin: 0 0 10px; }
 .rel-folha h3 { font-size: 13.5px; margin: 14px 0 6px; }
 @media print { .rel-tab tr.nosso td { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* ===== Relatório do mapa dos votos ===== */
+.relm-grade { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; margin-top: 4px; }
+.relm-mapa { border: 1px solid #cfdde5; border-radius: 10px; padding: 8px; break-inside: avoid; }
+.relm-mapa-svg { height: 150mm; position: relative; }
+.relm-mapa-svg .mes-dica { display: none !important; }
+.relm-mapa-svg .mes-mun { stroke-width: .8px; cursor: default; }
+.relm-legenda { display: flex; flex-wrap: wrap; gap: 3px 10px; font-size: 8pt; color: #4b6576; font-weight: 600; margin-top: 4px; }
+.relm-legenda b { width: 100%; color: #10212c; font-size: 8.5pt; }
+.relm-legenda span { display: inline-flex; align-items: center; gap: 4px; }
+.relm-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.relm-legenda i.zero { background: repeating-linear-gradient(45deg, #e9eef1 0 2px, #c9d3d9 2px 3px); }
+.relm-top h2 { margin-top: 0; }
+.relm-top ol { list-style: none; margin: 0; padding: 0; }
+.relm-top li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 3.5px 0; border-bottom: 1px solid #e3ecf1; font-size: 9pt; }
+.relm-top .p { color: #4b6576; font-weight: 700; font-size: 8pt; }
+.relm-top .nm { font-weight: 700; min-width: 0; }
+.relm-top .nm i { display: block; height: 3px; background: #e3ecf1; border-radius: 3px; margin-top: 2px; overflow: hidden; }
+.relm-top .nm i b { display: block; height: 100%; background: var(--azul); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.relm-top .v { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.relm-top .v small { display: block; font-weight: 600; font-size: 7.5pt; color: #4b6576; }
+.relm-sem { font-size: 9pt; line-height: 1.6; margin: 0; }
+.rel-tab tr.zero td { color: #7b93a3; }
+.quebra-antes { break-before: page; }
+@media print { .relm-mapa svg path { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .relm-mapa, .relm-mapa-svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+@media (max-width: 720px) { .relm-grade { grid-template-columns: 1fr; } .relm-mapa-svg { height: 110vw; } }
+.rel-tab tr.total td { font-weight: 800; border-top: 1.5px solid #9fb8c6; background: #fff !important; break-inside: avoid; }

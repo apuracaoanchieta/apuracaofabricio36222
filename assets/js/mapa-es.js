@@ -7,11 +7,12 @@ var MapaES = (function () {
   // escala sequencial (um tom só, do claro ao escuro) — azul da campanha
   var RAMPA = ['#cfe9f3', '#8fcde4', '#45abd3', '#0a83b5', '#0b4f78'];
   var COR_ZERO = '#e9eef1';
-  var geoPromessa = null;
+  var geoPromessa = null, geoLista = null;
 
   function norm(v) { return String(v || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
   function carregarGeo() {
-    if (!geoPromessa) geoPromessa = fetch('assets/data/es-municipios.json').then(function (r) { if (!r.ok) throw new Error('Mapa não encontrado.'); return r.json(); });
+    if (!geoPromessa) geoPromessa = fetch('assets/data/es-municipios.json').then(function (r) { if (!r.ok) throw new Error('Mapa não encontrado.'); return r.json(); })
+      .then(function (g) { geoLista = g.map(function (f) { return { chave: norm(f.n), nome: f.n }; }); return g; });
     return geoPromessa;
   }
   function el(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
@@ -245,5 +246,5 @@ var MapaES = (function () {
     return { config: v.config, municipios: Object.keys(porMun).map(function (k) { return porMun[k]; }), locais: [], agora: v.agora };
   }
 
-  return { criar: criar, norm: norm, preparar: preparar, pct: pct, deVisao: deVisao, RAMPA: RAMPA };
+  return { criar: criar, norm: norm, preparar: preparar, pct: pct, deVisao: deVisao, RAMPA: RAMPA, carregarGeo: carregarGeo, chavesGeo: function () { return geoLista || []; } };
 })();

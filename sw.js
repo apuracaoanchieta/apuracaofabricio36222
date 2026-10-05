@@ -1,10 +1,10 @@
 /* Guarda as telas no celular para abrir mesmo sem internet */
-var VERSAO = 'apuracao-v25';
+var VERSAO = 'apuracao-v26';
 var ARQUIVOS = [
   './', 'index.html', 'fiscal.html', 'apuracao.html', 'partido.html', 'telao.html', 'relatorio.html', 'manifest.webmanifest',
   'assets/css/app.css', 'assets/css/telao.css', 'assets/css/relatorio.css', 'assets/js/config.js', 'assets/js/core.js', 'assets/js/common.js',
   'assets/js/fiscal.js', 'assets/js/painel.js', 'assets/js/apuracao.js', 'assets/js/partido.js', 'assets/js/telao.js', 'assets/js/relatorio.js', 'assets/js/relatorios.js',
-  'mapa.html', 'telao-mapa.html', 'assets/js/estado-tse.js', 'assets/data/tse-es-2026-final.json', 'assets/js/mapa.js', 'assets/js/mapa-es.js', 'assets/js/telao-mapa.js', 'assets/data/es-municipios.json',
+  'mapa.html', 'telao-mapa.html', 'relatorio-mapa.html', 'assets/js/relatorio-mapa.js', 'assets/js/estado-tse.js', 'assets/data/tse-es-2026-final.json', 'assets/js/mapa.js', 'assets/js/mapa-es.js', 'assets/js/telao-mapa.js', 'assets/data/es-municipios.json',
   'tse.html', 'partido-tse.html', 'relatorio-final.html', 'assets/js/relatorio-final.js', 'assets/js/tse-aviso.js', 'telao-tse.html', 'assets/js/telao-tse.js', 'assets/js/tse.js', 'assets/js/tse-logica.js', 'assets/js/tse-demo.js', 'assets/js/candidatos-tse-es2026.js',
   'assets/img/logo-480.png', 'assets/img/favicon.png', 'assets/img/icon-192.png', 'assets/img/icon-512.png'
 ];
