@@ -140,7 +140,7 @@ var App = (function () {
       });
     }
     var ctrl = window.AbortController ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, opcoes.timeout || 30000);
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, opcoes.timeout || 90000);
     return fetch(CFG.API_URL, {
       method: 'POST', body: JSON.stringify(req), redirect: 'follow', signal: ctrl ? ctrl.signal : undefined
     }).then(function (resp) {
